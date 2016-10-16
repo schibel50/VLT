@@ -18,5 +18,6 @@ public class Part {
     
     public Part(String name){
         this.name=name;
+        ports = new ArrayList<>();
     }
 }

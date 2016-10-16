@@ -21,6 +21,8 @@ public class Module {
     
     public Module(String name){
         this.name = name;
+        parts = new ArrayList<>();
+        wires = new ArrayList<>();
     }
 
     /**

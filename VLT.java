@@ -6,6 +6,7 @@
 package vlt;
 
 import java.util.ArrayList;
+import java.util.Scanner;
 
 
 /**
@@ -21,13 +22,17 @@ public class VLT {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-//        filename=args[0];
-        filename="maxfinder.v";
+        Scanner scan = new Scanner(System.in);
+        System.out.println("Enter name of .v file:");
+        filename=scan.nextLine();
+        
+        code = new ArrayList<>();
         
         Loader loader = new Loader(code);
         loader.loadFile(filename);
         Compiler compiler = new Compiler(code);
-//        loader.saveFile("output.txt");
+        compiler.compile();
+        loader.saveFile("output.txt",compiler.edif);
     }
     
 }

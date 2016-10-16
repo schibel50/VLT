@@ -15,6 +15,7 @@ public class Compiler {
     
     public ArrayList<String> code;
     public Module module;
+    public EWriter edif;
     public String[] operators = {"+","-"};
     
     public int numWires;
@@ -30,14 +31,15 @@ public class Compiler {
      * compile method converts the input .v file to the output EDIF layout
      */
     public void compile(){
-        //first sweep: scan for any 'modules'
+        
         char currentChar = ' ';
         int i,j;
         module = new Module("NAME");
         for(i=0;i<code.size();i++){
-//                if(code[i].substring(0,8).equals("module "))
-//                    module = new Module();
-                
+//            if(code[i].substring(0,8).equals("module "))
+//                module = new Module();
+            
+            if(!code.get(i).isEmpty()){ //if the line is empyy, skip it!
                 //add inputs to the module
                 if(code.get(i).substring(0,5).equals("input")){
                     if(code.get(i).substring(5,6).equals(" ")){
@@ -45,83 +47,28 @@ public class Compiler {
                     }
                 }
                 //add outputs to the module
-                if(code.get(i).substring(0,6).equals("output")){
+                else if(code.get(i).substring(0,6).equals("output")){
                     if(code.get(i).substring(6,7).equals(" ")){
-                        module.addOutputs(code.get(i).substring(6).split("\\,"));
+                        module.addOutputs(code.get(i).substring(7).split("\\,"));
                     }
                 }
                 //add wires to the module
-                if(code.get(i).substring(0,4).equals("wire")){
+                else if(code.get(i).substring(0,4).equals("wire")){
                     if(code.get(i).substring(4,5).equals(" ")){
-                        module.addWires(code.get(i).substring(6).split("\\,"));
+                        module.addWires(code.get(i).substring(5).split("\\,"));
                     }
                 }
                 //assign wires
-                if(code.get(i).substring(0,6).equals("assign")){
+                else if(code.get(i).substring(0,6).equals("assign")){
                     if(code.get(i).substring(6,7).equals(" ")){
                         assign(code.get(i).substring(7));
                     }
                 }
-                
-////////////////////////////////////////////////////////////////////////////////////////////////                
-//            for(j=0;currentChar!='\n';j++){
-//                if(code.get(i).charAt(j)=='i'){ //add inputs
-//                    if(code.get(i).substring(j,j+5).equals("input")){
-//                        j+=5;
-//                        while(code.get(i).charAt(j)==' ') j++;
-//                            String name="";
-//                            while((code.get(i).charAt(j)!=' ')&&(code.get(i).charAt(j)!=',')){
-//                                name+=code.get(i).charAt(j);
-//                            }
-//                            module.addInput(name);
-//                        
-//                    }
-//                }
-//                
-//                if(code.get(i).charAt(j)=='o'){ //add outputs
-//                    if(code.get(i).substring(j,j+6).equals("output")){
-//                        j+=6;
-//                        while(code.get(i).charAt(j)==' ') j++;
-//                            String name="";
-//                            while((code.get(i).charAt(j)!=' ')&&(code.get(i).charAt(j)!=',')){
-//                                name+=code.get(i).charAt(j);
-//                            }
-//                            module.addOutput(name);
-//                        
-//                    }
-//                }
-//                
-//                if(code.get(i).charAt(j)=='w'){ //add wires
-//                    if(code.get(i).substring(j,j+4).equals("wire")){
-//                        j+=4;
-//                        while(code.get(i).charAt(j)==' ') j++;
-//                            String name="";
-//                            while((code.get(i).charAt(j)!=' ')&&(code.get(i).charAt(j)!=',')){
-//                                name+=code.get(i).charAt(j);
-//                            }
-//                            module.addWire(name);
-//                        
-//                    }
-//                }
-//                
-//                if(code.get(i).charAt(j)=='a'){ //assign statements
-//                    if(code.get(i).substring(j,j+6).equals("assign")){
-//                        j+=6;
-//                        while(code.get(i).charAt(j)==' ') j++;
-//                            String name="";
-//                            while((code.get(i).charAt(j)!=' ')&&(code.get(i).charAt(j)!=',')
-//                                    &&(code.get(i).charAt(j)!='=')){
-//                                name+=code.get(i).charAt(j);
-//                            }
-//                            module.setWire(name);
-//                        
-//                    }
-//                }
-//                
-//            }
+            }
         }
         
-        //second sweep: read through code in order, sans modules
+        edif = new EWriter(module);
+        edif.write();
     }
     /**
      * Determines the left side of the equation
@@ -133,6 +80,7 @@ public class Compiler {
         while(statement.charAt(j)==' ') j++;
         while((statement.charAt(j)!=' ')&&(statement.charAt(j)!='=')){
             lse+=statement.charAt(j);
+            j++;
         }
         
         while((statement.charAt(j)==' ')||(statement.charAt(j)=='=')) j++;
@@ -147,7 +95,7 @@ public class Compiler {
         int j=0,k=0;
         String lop=null,op=null,rop=null; //left of op, op, right of op
         while(j<statement.length()){
-            switch(statement.charAt(j)){
+            switch(statement.charAt(j)){ //act based on the current char
                 case ' ':
                     break;
                 
@@ -187,7 +135,10 @@ public class Compiler {
             }
             j++;
         }
-        return finalAssign(lop,op,rop);
+        if(op==null)
+            return null;
+        else
+            return finalAssign(lop,op,rop);
     }
     /**
      * Creates Part, Wires for given operator and Wire names
@@ -211,7 +162,8 @@ public class Compiler {
                 tempR.ports.add(newAdder.ports.get(0));
                 tempL.ports.add(newAdder.ports.get(1));
                 module.addWire("MISC"+numWires).ports.add(newAdder.ports.get(3));
-                return ("MISC"+numWires);
+                numWires++; numAdders++;
+                return ("MISC"+(numWires-1));
                 
             case 1:
                 Subtractor newSub = new Subtractor("ADD"+numAdders);
@@ -219,7 +171,8 @@ public class Compiler {
                 tempR.ports.add(newSub.ports.get(0));
                 tempL.ports.add(newSub.ports.get(1));
                 module.addWire("MISC"+numWires).ports.add(newSub.ports.get(3));
-                return ("MISC"+numWires);
+                numWires++; numAdders++;
+                return ("MISC"+(numWires-1));
         }
         return null;
     }

@@ -17,6 +17,7 @@ public class Wire {
     
     public Wire(String name){
         this.name = name;
+        ports = new ArrayList<>();
     }
     
     public void addPort(Port port){

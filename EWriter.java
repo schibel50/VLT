@@ -62,6 +62,7 @@ public class EWriter {
             instances.add("\t\t\t\t\t(instance " + temp.name + " (viewRef VIEWNAMEDEFAULT");
             instances.add("\t\t\t\t\t\t(cellRef  (libraryRef " + "LIBRARY NAME" + "))");
             instances.add("\t\t\t\t\t\t))");
+            i++;
         }
         
         IOs.add("\t\t\t\t(interface");
@@ -75,14 +76,16 @@ public class EWriter {
             while(k<temp.ports.size()){
                 if(temp.ports.get(k).IO==1){ //port is an input
                     IOs.add("\t\t\t\t\t(port " + temp.ports.get(k).name + "(direction input))");
-                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k));
-                }else if(temp.ports.get(k).IO==0){ //port is an output
-                    IOs.add("(port " + temp.ports.get(k).name + "(direction output))");
-                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k));
-                }
-                nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k) + " (instanceRef " + temp.ports.get(k).part.name + ")");
+                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k).name);
+                }else if(temp.ports.get(k).IO==-1){ //port is an output
+                    IOs.add("\t\t\t\t\t(port " + temp.ports.get(k).name + "(direction output))");
+                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k).name);
+                }else
+                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k).name + " (instanceRef " + temp.ports.get(k).part.name + ")");
+                k++;
             }
             nets.add("\t\t\t\t\t\t))");
+            j++;
         }
         
         IOs.add("\t\t\t\t)");

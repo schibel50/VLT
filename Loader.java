@@ -31,8 +31,6 @@ public class Loader {
             FileReader reader = new FileReader(fn);
             BufferedReader buffer = new BufferedReader(reader);
             
-            code = new ArrayList<>();
-            
             String line = buffer.readLine();
             
             int i;
@@ -50,7 +48,7 @@ public class Loader {
         }
     }
     
-    public void saveFile(String fn){
+    public void saveFile(String fn, EWriter edif){
         try{
             File file = new File(fn);
             
@@ -60,13 +58,26 @@ public class Loader {
             FileWriter writer = new FileWriter(fn);
             BufferedWriter buffer = new BufferedWriter(writer);
             
-            while(){
-                
+            for (String top : edif.top) {
+                buffer.write(top);
+                buffer.newLine();
             }
             
-            buffer.write("this is a write test. do not think much of it");
-            buffer.newLine(); //like pressing 'enter'
-            buffer.write("testing a new line here");
+            for (String IO : edif.IOs) {
+                buffer.write(IO);
+                buffer.newLine();
+            }
+            
+            for (String instance : edif.instances) {
+                buffer.write(instance);
+                buffer.newLine();
+            }
+            
+            for (String net : edif.nets) {
+                buffer.write(net);
+                buffer.newLine();
+            }
+            
             buffer.close();
             
         }catch(IOException e){}
