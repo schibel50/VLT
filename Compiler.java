@@ -32,14 +32,14 @@ public class Compiler {
      */
     public void compile(){
         
-        char currentChar = ' ';
+        String currentString;
         int i,j;
         module = new Module("NAME");
         for(i=0;i<code.size();i++){
 //            if(code[i].substring(0,8).equals("module "))
 //                module = new Module();
-            
-            if(!code.get(i).isEmpty()){ //if the line is empyy, skip it!
+            currentString = code.get(i);
+            if(!code.get(i).isEmpty() && code.get(i).length() > 4){ //if the line is empyy, skip it!
                 //add inputs to the module
                 if(code.get(i).substring(0,5).equals("input")){
                     if(code.get(i).substring(5,6).equals(" ")){
@@ -84,26 +84,31 @@ public class Compiler {
         }
         
         while((statement.charAt(j)==' ')||(statement.charAt(j)=='=')) j++;
-        assign2(statement.substring(j));
+       assign2(statement.substring(j),lse);
     }
     /**
      * Determines the right side of the equation, recursively
      * @param statement the statement
      * @return a name of a Wire
      */
-    public String assign2(String statement){
+    public String assign2(String statement,String lse){
         int j=0,k=0;
         String lop=null,op=null,rop=null; //left of op, op, right of op
         while(j<statement.length()){
             switch(statement.charAt(j)){ //act based on the current char
                 case ' ':
+                    if(rop != null){
+                        String temp2 = finalAssign(lop,op,rop,lse,false);
+                        lop = temp2;
+                        rop = null;
+                    }
                     break;
                 
                 case '(':
                     k=statement.length()-1;
                     while(statement.charAt(k)!=')') k--;
                     String temp;
-                    temp = assign2(statement.substring(j+1,k));
+                    temp = assign2(statement.substring(j+1,k),null);
                     if(op==null)
                         lop=temp;
                     else{
@@ -136,9 +141,15 @@ public class Compiler {
             j++;
         }
         if(op==null)
-            return null;
+            return finalAssign(lop,op,rop,lse,true);
         else
-            return finalAssign(lop,op,rop);
+            if(j != statement.length())
+                return assign2(finalAssign(lop,op,rop,lse,false) + statement.substring(j),lse);
+            else if(lse == null){
+                return finalAssign(lop,op,rop,lse,false);
+            }
+            else
+                return finalAssign(lop,op,rop,lse,true);
     }
     /**
      * Creates Part, Wires for given operator and Wire names
@@ -147,12 +158,23 @@ public class Compiler {
      * @param rop name right of operator
      * @return name of the wire to represent result of operation
      */
-    public String finalAssign(String lop,String op,String rop){
+    public String finalAssign(String lop,String op,String rop,String lse,boolean end){
         int i,j;
-        for(i=0;!lop.equals(module.wires.get(i).name);i++);
-        Wire tempR = module.wires.get(i);
-        for(j=0;!rop.equals(module.wires.get(j).name);j++);
-        Wire tempL = module.wires.get(j);
+        Wire tempLSE = null;
+        Wire tempR = null;
+        Wire tempL = null;
+        if(lop != null){
+            for(i=0;!lop.equals(module.wires.get(i).name);i++);
+            tempR = module.wires.get(i);
+        }
+        if(rop != null){
+            for(j=0;!rop.equals(module.wires.get(j).name);j++);
+            tempL = module.wires.get(j);
+        }
+        if(lse != null){
+            for(j=0;!lse.equals(module.wires.get(j).name);j++);
+            tempLSE = module.wires.get(j);
+        }
         int k;
         for(k=0;!op.equals(operators[k]);k++);
         switch(k){
@@ -161,18 +183,32 @@ public class Compiler {
                 module.parts.add(newAdder);
                 tempR.ports.add(newAdder.ports.get(0));
                 tempL.ports.add(newAdder.ports.get(1));
-                module.addWire("MISC"+numWires).ports.add(newAdder.ports.get(3));
-                numWires++; numAdders++;
-                return ("MISC"+(numWires-1));
+                if(!end || lse == null){
+                    module.addWire("MISC"+numWires).ports.add(newAdder.ports.get(3));
+                    numWires++; numAdders++;
+                    return ("MISC"+(numWires-1));
+                }
+                else{
+                    tempLSE.ports.add(newAdder.ports.get(3));
+                    numAdders++;
+                    return tempLSE.name;
+                }
                 
             case 1:
                 Subtractor newSub = new Subtractor("ADD"+numAdders);
                 module.parts.add(newSub);
                 tempR.ports.add(newSub.ports.get(0));
                 tempL.ports.add(newSub.ports.get(1));
-                module.addWire("MISC"+numWires).ports.add(newSub.ports.get(3));
-                numWires++; numAdders++;
-                return ("MISC"+(numWires-1));
+                if(!end || lse == null){
+                    module.addWire("MISC"+numWires).ports.add(newSub.ports.get(3));
+                    numWires++; numAdders++;
+                    return ("MISC"+(numWires-1));
+                }
+                else{
+                    tempLSE.ports.add(newSub.ports.get(3));
+                    numAdders++;
+                    return tempLSE.name;
+                }
         }
         return null;
     }
