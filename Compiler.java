@@ -16,8 +16,8 @@ public class Compiler {
     public ArrayList<String> code;
     public Module module;
     public EWriter edif;
-    public String[] operators = {"+","-"};
-    
+    public String[] operators = {"+","-",">=","<=","==","!=","<",">","<<",">>",
+        "!","~","&","|","~&","~|","^","~^","^~","*","/","%","&&","||","?",":"};
     public int numWires;
     public int numAdders;
     
@@ -100,10 +100,18 @@ public class Compiler {
                     break;
                 
                 case '(':
-                    k=statement.length()-1;
-                    while(statement.charAt(k)!=')') k--;
-                    String temp;
-                    temp = assign2(statement.substring(j+1,k));
+//                    k=statement.length()-1;
+//                    while(statement.charAt(k)!=')') k--;
+                    int count=1;
+                    k=j+1;
+                    while(count>0){
+                        if(statement.charAt(k)=='(')
+                            count++;
+                        if(statement.charAt(k)==')')
+                            count--;
+                        k++;
+                    }
+                    String temp = assign2(statement.substring(j+1,k-2));
                     if(op==null)
                         lop=temp;
                     else{
@@ -119,6 +127,67 @@ public class Compiler {
                 case '-':
                     op="-";
                     break;
+                    
+                case '*':
+                    op="*";
+                    break;
+                    
+                case '/':
+                    op="/";
+                    
+                case '%':
+                    op="%";
+                    
+                case '>':
+                    if(op==null)
+                        op="";
+                    op+=">";
+                    break;
+                    
+                case '<':
+                    if(op==null)
+                        op="";
+                    op+="<";
+                    break;
+                    
+                case '=':
+                    if(op==null)
+                        op="";
+                    op+="=";
+                    break;
+                    
+                case '!':
+                    op="!";
+                    break;
+                    
+                case '~':
+                    if(op==null)
+                        op="";
+                    op+="~";
+                    break;
+                    
+                case '&':
+                    if(op==null)
+                        op="";
+                    op+="&";
+                    break;
+                    
+                case '|':
+                    if(op==null)
+                        op="";
+                    op+="|";
+                    break;
+                    
+                case '^':
+                    if(op==null)
+                        op="";
+                    op+="^";
+                    
+                case '?':
+                    op="?";
+                    
+                case ':':
+                    op=":";
                     
                 case ';':
                     break;
@@ -148,11 +217,12 @@ public class Compiler {
      * @return name of the wire to represent result of operation
      */
     public String finalAssign(String lop,String op,String rop){
-        int i,j;
-        for(i=0;!lop.equals(module.wires.get(i).name);i++);
-        Wire tempR = module.wires.get(i);
-        for(j=0;!rop.equals(module.wires.get(j).name);j++);
-        Wire tempL = module.wires.get(j);
+        Wire tempR=null, tempL=null;
+        for (Wire wire : module.wires) {
+            if (rop.equals(wire.name)) tempR = wire;
+            if (lop.equals(wire.name)) tempL = wire;
+        }
+        
         int k;
         for(k=0;!op.equals(operators[k]);k++);
         switch(k){
@@ -165,7 +235,7 @@ public class Compiler {
                 numWires++; numAdders++;
                 return ("MISC"+(numWires-1));
                 
-            case 1:
+            case 1: //SUBTRACTOR
                 Subtractor newSub = new Subtractor("ADD"+numAdders);
                 module.parts.add(newSub);
                 tempR.ports.add(newSub.ports.get(0));
