@@ -111,13 +111,13 @@ public class Compiler {
                             count--;
                         k++;
                     }
-                    String temp = assign2(statement.substring(j+1,k-2));
+                    String temp = assign2(statement.substring(j+1,k-1));
                     if(op==null)
                         lop=temp;
                     else{
                         rop=temp;
                     }
-                    j=k;
+                    j=k-1;
                     break;
                     
                 case '+':
