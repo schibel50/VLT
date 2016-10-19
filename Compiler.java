@@ -20,6 +20,9 @@ public class Compiler {
         "!","~","&","|","~&","~|","^","~^","^~","*","/","%","&&","||","?",":"};
     public int numWires;
     public int numAdders;
+    public int numInverters;
+    public int numAnds;
+    public int numOrs;
     
     public Compiler(ArrayList<String> code){
         this.code = code;
@@ -245,5 +248,48 @@ public class Compiler {
                 return ("MISC"+(numWires-1));
         }
         return null;
+    }
+    
+    /**
+     * Convert parts not in database into gate layouts
+     * @param part the part to be converted
+     * @param wires array of Wires [output,input] to the part
+     */
+    public void part2gate(Part part,Wire[] wires){
+        if(part instanceof Comparator){
+//            Not n1 = new Not("INV"+numInverters);
+//            Not n2 = new Not("INV"+numInverters+1);
+//            Not n3 = new Not("INV"+numInverters+2);
+//            And a1 = new And("AND"+numAnds);
+//            And a2 = new And("AND"+numAnds+1);
+//            Or o1 = new Or("OR"+numOrs);
+//            numInverters+=3; numAnds+=2; numOrs++;
+//            Wire wire = new Wire("MISC"+numWires);
+//            wire.ports.add(n1.ports.get(2));
+//            wire.ports.add(a1.ports.get(1));
+//            module.wires.add(wire);
+//            wire = new Wire("MISC"+numWires+1);
+//            wire.ports.add(n2.ports.get(2));
+//            wire.ports.add(a2.ports.get(1));
+//            module.wires.add(wire);
+//            wire = new Wire("MISC"+numWires+2);
+//            wire.ports.add(a1.ports.get(2));
+//            wire.ports.add(o1.ports.get(0));
+//            module.wires.add(wire);
+//            wire = new Wire("MISC"+numWires+3);
+//            wire.ports.add(a2.ports.get(2));
+//            wire.ports.add(o1.ports.get(1));
+//            module.wires.add(wire);
+            //wires = [EQ,GT,LT,a,b]
+            assign(wires[0].name+" = !("+wires[3].name+"^"+wires[4].name+");"); //x=y
+            assign(wires[1].name+" = "+wires[3].name+"&(!"+wires[4].name+");"); //x>y
+            assign(wires[2].name+" = (!"+wires[3].name+")&"+wires[4].name+";"); //x<y
+        }else if(part instanceof Adder){
+            //wires = [S,Cout,a,b,Cin]
+            module.addWire("MISC"+numWires);
+            assign("MISC"+numWires + " = ("+wires[2].name+"^"+wires[3].name+")");
+            assign(wires[0]+" = MISC0"+numWires+"^"+wires[4].name); //S
+            assign(wires[1]+" = (Cin&MISC"+numWires+")|("+wires[2].name+"&"+wires[3].name+")"); //Cout
+        }
     }
 }
