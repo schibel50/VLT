@@ -20,3 +20,4 @@ public class Comparator extends Part{
         ports.add(new Port("Less",this));
     }
 }
+//">>","<<","~","&","|","~&","~|","~^","^~","%"
