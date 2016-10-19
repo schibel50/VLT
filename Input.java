@@ -10,8 +10,9 @@ package vlt;
  * @author Ryan
  */
 public class Input extends Part{
-    
-    public Input(String name){
+    int size;
+    public Input(String name, int size){
         super(name);
+        this.size = size;
     }
 }

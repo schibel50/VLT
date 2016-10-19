@@ -36,16 +36,16 @@ public class Module {
      * Add an input to the module
      * @param name name of the input
      */
-    public void addInput(String name){
-        wires.add(new Wire(name));
+    public void addInput(String name, int size){
+        wires.add(new Wire(name,size));
         wires.get(wires.size()-1).addPort(new Port(name,(byte)1));
     }
     /**
      * Add an output to the module
      * @param name name of the output
      */
-    public void addOutput(String name){
-        wires.add(new Wire(name));
+    public void addOutput(String name, int size){
+        wires.add(new Wire(name,size));
         wires.get(wires.size()-1).addPort(new Port(name,(byte)-1));
     }
     /**
@@ -53,8 +53,8 @@ public class Module {
      * @param name name of the Wire
      * @return a reference to the new Wire
      */
-    public Wire addWire(String name){
-        wires.add(new Wire(name));
+    public Wire addWire(String name, int size){
+        wires.add(new Wire(name,size));
         return wires.get(wires.size()-1);
     }
     
@@ -62,10 +62,10 @@ public class Module {
      * Add inputs to the module
      * @param names list of names, separated by commas
      */
-    public void addInputs(String[] names){
+    public void addInputs(String[] names, int size){
         int i;
         for(i=0;i<names.length;i++){
-            wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")));
+            wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";",""),size));
             wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";",""),(byte)1));
         }
     }
@@ -73,10 +73,10 @@ public class Module {
      * Add outputs to the module
      * @param names list of names, separated by commas
      */
-    public void addOutputs(String[] names){
+    public void addOutputs(String[] names, int size){
         int i;
         for(i=0;i<names.length;i++){
-            wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")));
+            wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";",""),size));
             wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";",""),(byte)-1));
         }
     }
@@ -84,9 +84,9 @@ public class Module {
      * Add Wires to the module
      * @param names list of names, separated by commas
      */
-    public void addWires(String[] names){
+    public void addWires(String[] names, int size){
         int i;
         for(i=0;i<names.length;i++)
-            wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")));
+            wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";",""),size));
     }
 }
