@@ -6,63 +6,63 @@
 package vlt;
 
 import java.util.ArrayList;
-
+import java.lang.String;
+import java.lang.Boolean;
 /**
  *
- * @author Ryan
+ * @author Parker
  */
+
 public class Compiler {
-    
     public ArrayList<String> code;
     public Module module;
     public EWriter edif;
-    public String[] operators = {"+","-"};
+    public String[] operators = {"+","-",">=","!","?:"};
     
     public int numWires;
     public int numAdders;
+    public int numSubtractors;
+    public int numComparators;
+    public int numMuxs;
+    public int numInverters;
+    public int numORs;
     
     public Compiler(ArrayList<String> code){
-        this.code = code;
+        //initialize everything
+        this.code=code;
         numWires=0;
         numAdders=0;
-    }//ctor
+        numSubtractors=0;
+        numComparators=0;
+        numMuxs=0;
+        numInverters=0;
+        numORs=0;
+    }
     
-     /**
-     * compile method converts the input .v file to the output EDIF layout
-     */
     public void compile(){
-        
-        char currentChar = ' ';
-        int i,j;
         module = new Module("NAME");
-        for(i=0;i<code.size();i++){
-//            if(code[i].substring(0,8).equals("module "))
-//                module = new Module();
-            
-            if(!code.get(i).isEmpty()){ //if the line is empyy, skip it!
-                //add inputs to the module
+        for(int i=0; i<code.size(); i++){
+            //make sure the line is not empty and is not a comment
+            if(!code.get(i).isEmpty() && code.get(i).length() > 4){
+                //add all the inputs
                 if(code.get(i).substring(0,5).equals("input")){
-                    if(code.get(i).substring(5,6).equals(" ")){
+                    if(code.get(i).substring(5,6).equals(" "))
                         module.addInputs(code.get(i).substring(6).split("\\,"));
-                    }
                 }
-                //add outputs to the module
+                //add all the outputs
                 else if(code.get(i).substring(0,6).equals("output")){
-                    if(code.get(i).substring(6,7).equals(" ")){
+                    if(code.get(i).substring(6,7).equals(" "))
                         module.addOutputs(code.get(i).substring(7).split("\\,"));
-                    }
                 }
-                //add wires to the module
+                //add all the predefined wires
                 else if(code.get(i).substring(0,4).equals("wire")){
-                    if(code.get(i).substring(4,5).equals(" ")){
+                    if(code.get(i).substring(4,5).equals(" "))
                         module.addWires(code.get(i).substring(5).split("\\,"));
-                    }
                 }
-                //assign wires
+                //assign all the predefined wires
                 else if(code.get(i).substring(0,6).equals("assign")){
-                    if(code.get(i).substring(6,7).equals(" ")){
+                    if(code.get(i).substring(6,7).equals(" "))
                         assign(code.get(i).substring(7));
-                    }
                 }
             }
         }
@@ -70,110 +70,204 @@ public class Compiler {
         edif = new EWriter(module);
         edif.write();
     }
-    /**
-     * Determines the left side of the equation
-     * @param statement the statement
-     */
+    
     public void assign(String statement){
-        int j=0;
-        String lse="";
-        while(statement.charAt(j)==' ') j++;
-        while((statement.charAt(j)!=' ')&&(statement.charAt(j)!='=')){
-            lse+=statement.charAt(j);
-            j++;
+        //get the wire we are assigning to
+        int a = 0;
+        Wire left = null;
+        while(statement.charAt(a)!=' '&&statement.charAt(a)!='=')
+            a++;
+        for(Wire wire : module.wires){
+            if(wire.name.equals(statement.substring(0,a)))
+                left = wire;
         }
+        //break up each expression and connect to operator
+        ArrayList<String> myStatements = new ArrayList<String>();
+        ArrayList<Boolean> finStatements = new ArrayList<Boolean>();
+        //get to the start of the right side of the equation
+        while(statement.charAt(a)==' '||statement.charAt(a)=='=')
+            a++;
         
-        while((statement.charAt(j)==' ')||(statement.charAt(j)=='=')) j++;
-        assign2(statement.substring(j));
-    }
-    /**
-     * Determines the right side of the equation, recursively
-     * @param statement the statement
-     * @return a name of a Wire
-     */
-    public String assign2(String statement){
-        int j=0,k=0;
-        String lop=null,op=null,rop=null; //left of op, op, right of op
-        while(j<statement.length()){
-            switch(statement.charAt(j)){ //act based on the current char
+        //go through the right side of the equation and add to the Arraylist
+        //until the ; is reached
+        String temp = null;
+        while(statement.charAt(a)!=';'){
+            switch(statement.charAt(a)){
                 case ' ':
+                    if(temp != null){
+                        myStatements.add(temp);
+                        finStatements.add(Boolean.FALSE);
+                        temp=null;
+                    }
                     break;
-                
                 case '(':
-                    k=statement.length()-1;
-                    while(statement.charAt(k)!=')') k--;
-                    String temp;
-                    temp = assign2(statement.substring(j+1,k));
-                    if(op==null)
-                        lop=temp;
-                    else{
-                        rop=temp;
+                    break;
+                case ')':
+                    break;
+                case '>':
+                    if(statement.charAt(a+1)=='='){
+                        myStatements.add(statement.substring(a,a+2));
+                        finStatements.add(Boolean.FALSE);
+                        a++;
                     }
-                    j=k;
+                    else{
+                        myStatements.add("" + statement.charAt(a));
+                        finStatements.add(Boolean.FALSE);
+                    }
                     break;
-                    
-                case '+':
-                    op="+";
+                case '?':
+                    myStatements.add("" + statement.charAt(a));
+                    finStatements.add(Boolean.FALSE);
                     break;
-                    
-                case '-':
-                    op="-";
+                case ':':
+                    myStatements.add("" + statement.charAt(a));
+                    finStatements.add(Boolean.FALSE);
                     break;
-                    
-                case ';':
+                case '!':
+                    myStatements.add("" + statement.charAt(a));
+                    finStatements.add(Boolean.FALSE);
                     break;
-                    
                 default:
-                    if(lop==null) lop="";
-                    if(op==null)
-                        lop+=statement.charAt(j);
-                    else{
-                        if(rop==null) rop="";
-                        rop+=statement.charAt(j);
-                    }
-                    break;
+                    if(temp==null)
+                        temp="";
+                    temp+=statement.charAt(a);
             }
-            j++;
+            a++;
         }
-        if(op==null)
-            return null;
-        else
-            return finalAssign(lop,op,rop);
+        if(temp!=null){
+            myStatements.add(temp);
+            finStatements.add(Boolean.FALSE);
+        }
+        //things to watch for: (...), !, ?, :
+        //perform operations using functions and recursion
+        int b=0;
+        boolean done = true;
+        ArrayList<String> tempList= new ArrayList<String>();
+        String tempName = null;
+        //while(done){
+            //do all the comparators first
+        if(myStatements.size() > 1){
+            for(int i = 0; i < myStatements.size(); i++){
+                if(myStatements.get(i).equals(">=") ||
+                        myStatements.get(i).equals("<=") ||
+                        myStatements.get(i).equals(">") ||
+                        myStatements.get(i).equals("<")){
+                    tempList.add(myStatements.get(i-1));
+                    tempList.add(myStatements.get(i));
+                    tempList.add(myStatements.get(i+1));
+                    myStatements.remove(i-1);
+                    finStatements.remove(i-1);
+                    myStatements.remove(i-1);
+                    finStatements.remove(i-1);
+                    myStatements.remove(i-1);
+                    finStatements.remove(i-1);
+                    i--;
+                    for(int j = 0; j < myStatements.size(); j++){
+                        if(myStatements.get(j).equals("?")){
+                            tempList.add(myStatements.get(j));
+                            tempList.add(myStatements.get(j+1));
+                            tempList.add(myStatements.get(j+2));
+                            tempList.add(myStatements.get(j+3));
+                            myStatements.remove(j);
+                            myStatements.remove(j);
+                            myStatements.remove(j);
+                            myStatements.remove(j);
+                            finStatements.remove(j);
+                            finStatements.remove(j);
+                            finStatements.remove(j);
+                            finStatements.remove(j);
+                        }
+                    }
+                    tempName = comparator(tempList);
+                    myStatements.add(i,tempName);
+                    tempList.clear();
+                    finStatements.add(i,Boolean.TRUE);
+                    i++;
+                }
+                else if(myStatements.get(i).equals("?")){
+                    for(int j = 0; j < 5; j++){
+                        tempList.add(myStatements.get(i-1));
+                        myStatements.remove(i-1);
+                        finStatements.remove(i-1);
+                    }
+                    i--;
+                    myStatements.add(i,turnary(tempList));
+                    finStatements.add(i,Boolean.TRUE);
+                    tempList.clear();
+                }
+            }
+        }
+            int count = 0;
+            int finalCount = -1;
+            for(Wire wire : module.wires){
+                if(wire.name.equals(myStatements.get(0))){
+                    left.copy(wire);
+                    finalCount = count;
+                }
+                count++;
+            }
+            module.wires.remove(finalCount);
     }
-    /**
-     * Creates Part, Wires for given operator and Wire names
-     * @param lop name left of operator
-     * @param op the operator
-     * @param rop name right of operator
-     * @return name of the wire to represent result of operation
-     */
-    public String finalAssign(String lop,String op,String rop){
-        int i,j;
-        for(i=0;!lop.equals(module.wires.get(i).name);i++);
-        Wire tempR = module.wires.get(i);
-        for(j=0;!rop.equals(module.wires.get(j).name);j++);
-        Wire tempL = module.wires.get(j);
-        int k;
-        for(k=0;!op.equals(operators[k]);k++);
-        switch(k){
-            case 0: //ADDER
-                Adder newAdder = new Adder("ADD"+numAdders);
-                module.parts.add(newAdder);
-                tempR.ports.add(newAdder.ports.get(0));
-                tempL.ports.add(newAdder.ports.get(1));
-                module.addWire("MISC"+numWires).ports.add(newAdder.ports.get(3));
-                numWires++; numAdders++;
-                return ("MISC"+(numWires-1));
-                
-            case 1:
-                Subtractor newSub = new Subtractor("ADD"+numAdders);
-                module.parts.add(newSub);
-                tempR.ports.add(newSub.ports.get(0));
-                tempL.ports.add(newSub.ports.get(1));
-                module.addWire("MISC"+numWires).ports.add(newSub.ports.get(3));
-                numWires++; numAdders++;
+    
+    public String comparator(ArrayList<String> myCompStatement){
+        Wire Left = null;
+        Wire Right = null;
+        for(Wire wire : module.wires){
+            if(wire.name.equals(myCompStatement.get(0)))
+                Left = wire;
+            if(wire.name.equals(myCompStatement.get(2)))
+                Right = wire;
+        }
+        switch(myCompStatement.get(1)){
+            case ">=":
+                int temp1 = Integer.parseInt(myCompStatement.get(4));
+                int temp2 = Integer.parseInt(myCompStatement.get(6));
+                Comparator newCompGE = new Comparator("COMP>="+numComparators);
+                if(temp1 == 1 && temp2 == 0)
+                    newCompGE.activeLow = true;
+                else
+                    newCompGE.activeLow = false;
+                numComparators++;
+                module.parts.add(newCompGE);
+                Left.ports.add(newCompGE.ports.get(0));
+                Right.ports.add(newCompGE.ports.get(1));
+                module.addWire("MISC"+numWires).ports.add(newCompGE.ports.get(2));
+                numWires++;
+                module.addWire("MISC"+numWires).ports.add(newCompGE.ports.get(3));
+                numWires++;
+                OR newOR = new OR("OR"+numORs);
+                numORs++;
+                module.parts.add(newOR);
+                module.wires.get(module.wires.size()-2).ports.add(newOR.ports.get(0));
+                module.wires.get(module.wires.size()-1).ports.add(newOR.ports.get(1));
+                module.addWire("MISC"+numWires).ports.add(newOR.ports.get(2));
+                numWires++;
                 return ("MISC"+(numWires-1));
         }
-        return null;
+        return "";
+    }
+    
+    public String turnary(ArrayList<String> myTurnStatement){
+        Wire Left = null;
+        Wire Turn1 = null;
+        Wire Turn2 = null;
+        for(Wire wire : module.wires){
+            if(wire.name.equals(myTurnStatement.get(0)))
+                Left = wire;
+            if(wire.name.equals(myTurnStatement.get(2)))
+                Turn1 = wire;
+            if(wire.name.equals(myTurnStatement.get(4)))
+                Turn2 = wire;
+        }
+        Mux newMux = new Mux("MUX"+numMuxs);
+        numMuxs++;
+        module.parts.add(newMux);
+        Left.ports.add(newMux.ports.get(2));
+        Turn1.ports.add(newMux.ports.get(1));
+        Turn2.ports.add(newMux.ports.get(0));
+        module.addWire("MISC"+numWires).ports.add(newMux.ports.get(3));
+        numWires++;
+        return ("MISC"+(numWires-1));
     }
 }
+

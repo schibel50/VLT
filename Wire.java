@@ -23,4 +23,10 @@ public class Wire {
     public void addPort(Port port){
         ports.add(port);
     }
+    
+    public void copy(Wire wire){
+        for(Port port : wire.ports){
+            this.ports.add(port);
+        }
+    }
 }

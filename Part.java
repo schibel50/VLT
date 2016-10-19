@@ -15,9 +15,11 @@ public class Part {
     
     String name;
     ArrayList<Port> ports;
+    boolean activeLow;
     
     public Part(String name){
         this.name=name;
         ports = new ArrayList<>();
+        activeLow = false;
     }
 }
