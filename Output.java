@@ -10,8 +10,9 @@ package vlt;
  * @author Ryan
  */
 public class Output extends Part{
-    
-    public Output(String name){
+    int size;
+    public Output(String name, int size){
         super(name);
+        this.size = size;
     }
 }

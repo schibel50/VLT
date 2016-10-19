@@ -31,6 +31,7 @@ public class VLT {
         Loader loader = new Loader(code);
         loader.loadFile(filename);
         Compiler compiler = new Compiler(code);
+        compiler.moduleFinder();
         compiler.compile();
         loader.saveFile("output.txt",compiler.edif);
     }

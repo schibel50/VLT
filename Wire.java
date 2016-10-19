@@ -14,13 +14,21 @@ import java.util.ArrayList;
 public class Wire {
     String name;
     ArrayList<Port> ports;
+    int size;
     
-    public Wire(String name){
+    public Wire(String name,int size){
         this.name = name;
+        this.size = size;
         ports = new ArrayList<>();
     }
     
     public void addPort(Port port){
         ports.add(port);
+    }
+    
+    public void copy(Wire wire){
+        for(Port port : wire.ports){
+            this.ports.add(port);
+        }
     }
 }

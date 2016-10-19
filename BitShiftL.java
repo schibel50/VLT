@@ -7,12 +7,12 @@ package vlt;
 
 /**
  *
- * @author Ryan
+ * @author Parker
  */
-public class Input extends Part{
-    int size;
-    public Input(String name, int size){
+public class BitShiftL extends Part{
+    public BitShiftL(String name){
         super(name);
-        this.size = size;
+        ports.add(new Port("in",this));
+        ports.add(new Port("out",this));
     }
 }
