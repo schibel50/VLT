@@ -195,7 +195,8 @@ public class Compiler {
                     }
                 }
             }
-            //part2gate(currModule);
+            bit2bits(currModule);
+            part2gate(currModule);
         }
        
         edif = new EWriter(currModule);
@@ -387,7 +388,7 @@ public class Compiler {
                         myStatements.remove(i);
                         finStatements.remove(i);
                     }
-                    myStatements.add(i,and(tempList));
+                    myStatements.add(i,or(tempList));
                     tempList.clear();
                     finStatements.add(i,Boolean.TRUE);
                 }
@@ -513,11 +514,11 @@ public class Compiler {
             for(Wire wire : currModule.wires){
                 if(wire.name.equals(myStatements.get(0))){
                     left.copy(wire);
-                    left.name=wire.name;
                     finalCount = count;
                 }
                 count++;
             }
+            left.name=currModule.wires.get(finalCount).name;
             currModule.wires.remove(finalCount);
             return left.name;
         }
@@ -798,12 +799,44 @@ public class Compiler {
         return ("MISC"+(numWires-1));
     }
     
+    public void bit2bits(Module currModule){
+        
+    }
     /**
      * Convert parts not in database into gate layouts
      * @param part the part to be converted
      * @param wires array of Wires [output,input] to the part
      */
     public void part2gate(Module currModule){
+        ArrayList<Wire> currWires = new ArrayList<Wire>();
+        for(int i = 0; i < currModule.parts.size(); i++){
+            for(Wire wire : currModule.wires){
+                for(Port port : wire.ports){
+                    if(port.part != null){
+                        if(port.part.name.equals(currModule.parts.get(i).name)){
+                            currWires.add(wire);
+                        }
+                    }
+                }
+            }
+            if(currWires != null){
+                if(currModule.parts.get(i) instanceof Adder){
+                    adderBD(currModule.parts.get(i),currWires);
+                    for(int j = 0; j < currWires.size(); j++){
+                        for(int k = 0; k < currWires.get(j).ports.size(); k++){
+                            if(currWires.get(j).ports.get(k).part != null){
+                                if(currWires.get(j).ports.get(k).part.name.equals(currModule.parts.get(i).name)){
+                                    currWires.get(j).ports.remove(k);
+                                    k--;
+                                }
+                            }
+                        }
+                    }
+                    currModule.parts.remove(i);
+                    i--;
+                }
+            }
+        }
         /*
         if(part instanceof Comparator){
             //wires = [EQ,GT,LT,a,b]
@@ -829,6 +862,44 @@ public class Compiler {
             //wires = [out,in]
         }
 */
+    }
+    public int adderBD(Part addPart, ArrayList<Wire> partWires){
+        Wire[] myWires = new Wire[5];
+        for(Wire wire : partWires){
+            for(Port port : wire.ports){
+                if(port.part != null){
+                    if(port.part.name.equals(addPart.name)){
+                        if(port.name.equals("a"))
+                            myWires[0] = wire;
+                        else if(port.name.equals("b"))
+                            myWires[1] = wire;
+                        else if(port.name.equals("cin"))
+                            myWires[2] = wire;
+                        else if(port.name.equals("y"))
+                            myWires[3] = wire;
+                        else if(port.name.equals("cout"))
+                            myWires[4] = wire;
+                    }
+                }
+            }
+        }
+        for(int i = 0; i < 5; i++){
+            if(myWires[i] == null){
+                currModule.addWire("MISC"+numWires,1);
+                numWires++;
+                myWires[i] = currModule.wires.get(currModule.wires.size()-1);
+            }
+        }
+        String[] newWires = {"MISC"+numWires,"MISC"+(numWires+1),"MISC"+(numWires+2)};
+        currModule.addWire("MISC"+numWires,1); numWires++;
+        currModule.addWire("MISC"+numWires,1); numWires++;
+        currModule.addWire("MISC"+numWires,1); numWires++;
+        assign(newWires[0]+" = "+myWires[0].name+" ^ "+myWires[1].name+";");
+        assign(myWires[3].name+" = "+newWires[0]+" ^ "+myWires[2].name+";");
+        assign(newWires[1]+" = "+newWires[0]+" & "+myWires[2].name+";");
+        assign(newWires[2]+" = "+myWires[0].name+" & "+myWires[1].name+";");
+        assign(myWires[4].name+" = "+newWires[1]+" | "+newWires[2]+";");
+        return 5;
     }
 }
 
