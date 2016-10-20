@@ -22,4 +22,11 @@ public class Part {
         ports = new ArrayList<>();
         activeLow = false;
     }
+    
+    public void copy(Part part){
+        this.name = part.name;
+        for(int i = 0; i < part.ports.size(); i++)
+            this.ports.add(part.ports.get(i));
+        this.activeLow = part.activeLow;
+    }
 }

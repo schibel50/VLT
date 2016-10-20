@@ -11,10 +11,8 @@ package vlt;
  */
 public class Module_Part extends Part{
     
-    public String moduleName;
-    public Module_Part(String name, String modName, String[] portNames){
+    public Module_Part(String name, String[] portNames){
         super(name);
-        this.moduleName = modName;
         for(int i = 0; i < portNames.length; i++)
             ports.add(new Port(portNames[i], this));
     }
