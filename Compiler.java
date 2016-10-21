@@ -563,9 +563,21 @@ public class Compiler {
                 clk+=line.charAt(i);
             }
         }
-            
+        String[] ifData=null;
         for (int j=1;j<block.size();j++) { //go through the rest of the block
-            scan(j,block);
+            String[] temp=scan(j,block);
+            if(temp[0].equals("if"))
+                ifData = temp; //store names of muxs for impending else
+            else if(temp[0].equals("else")){
+                String[] temp2 = temp[1].split("\\,");
+                String[] temp3 = ifData[1].split("\\,");
+                for(int k=0;k<temp.length;k++){ //do this for every statement in the else
+                    for(Part part:currModule.parts){
+                        if(part.name.equals(temp3[k]))
+                            currModule.getWire(temp2[k]).addPort(part.ports.get(0));
+                    }
+                }
+            }
         }
         return null;
     }
@@ -576,9 +588,10 @@ public class Compiler {
      * @param block list of lines in the always block
      * @return code for what kind of statement it was
      */
-    public String scan(int index,ArrayList<String> block){
+    public String[] scan(int index,ArrayList<String> block){
         String[] ops = {"","",""}; //[lop,op,rop]
         String line = block.get(index);
+        String[] out = null;
         int type=0;
         for(int i=0;i<line.length();i++){ //retrieve statement logic
             if(line.charAt(i)=='<'){
@@ -607,7 +620,7 @@ public class Compiler {
                     type= -1;
                     break;
                 }else if(ops[0].equals("end")){ //end statement
-                    type= -1;
+                    type= -2;
                     break;
                 }
             }
@@ -615,20 +628,47 @@ public class Compiler {
         switch(type){
                 case 0: //'assign' statement
                     if(ops[1].equals("="))
-                        ;
-                    break;
+                        ; //create the connection
+                    return ops;
                 case 1: //if block
-                    //Loop this if there are multiple.
+                    String temp="";
                     index++;
-                    String out = scan(index,block); //scan line inside of 'if' block.
-                    //create MUX for 'a=b' statement, with 'a' as output, 'b' as data1, ops[1] as select; 'elsel will be data0
-                    break;
+                    out = scan(index,block); //for 'assign' statement, out=[a,op,b]
+                    if(out[0].equals("begin")) //there are multiple statements inside the if
+                        do{
+                            index++;
+                            out = scan(index,block);
+                            
+                            //create MUX for 'a=b' statement, with 'a' as output, 'b' as data1, ops[1] as select; 'else' will be data0
+                            Mux mux = new Mux("MISC"+numMuxs);
+                            numMuxs++;
+                            currModule.getWire(out[2]).addPort(mux.ports.get(1));
+                            currModule.getWire(out[0]).addPort(mux.ports.get(3));
+                            currModule.getWire(ops[1]).addPort(mux.ports.get(2));
+                            temp+=mux.name+",";
+                        }while(!out[0].equals("end"));
+                    else{ //there is only one statement inside the if
+                        
+                        //create MUX for 'a=b' statement, with 'a' as output, 'b' as data1, ops[1] as select; 'else' will be data0
+                        Mux mux = new Mux("MISC"+numMuxs);
+                        numMuxs++;
+                        currModule.getWire(out[2]).addPort(mux.ports.get(1));
+                        currModule.getWire(out[0]).addPort(mux.ports.get(3));
+                        currModule.getWire(ops[1]).addPort(mux.ports.get(2));
+                        temp+=mux.name+",";
+                    }
+                    
+                    return new String[]{"if",temp}; //return "if" and names of new muxs
                 case 2: //elif block
-                    break;
+                    
+                    
+                    return new String[]{"elif"};
                 case 3: //else block
-                    break;
-                case -1: //begin/end statement
-                    break;
+                    return new String[]{"else",""}; //return 'else' and name of output wires
+                case -1: //begin statement
+                    return new String[]{"begin"};
+                case -2:
+                    return new String[]{"end"};
             }
         return null;
     }
