@@ -565,30 +565,21 @@ public class Compiler {
         }
             
         for (int j=1;j<block.size();j++) { //go through the rest of the block
-            String[] ops = {"","",""};
-            switch(scan(block.get(j),ops)){
-                case 0:
-                    break;
-                case 1:
-                    break;
-                case 2:
-                    break;
-                case 3:
-                    break;
-                case -1:
-                    break;
-            }
+            scan(j,block);
         }
         return null;
     }
     
     /**
      * Helper method to always
-     * @param line 
-     * @param ops [lop,op,rop]
+     * @param index 
+     * @param block list of lines in the always block
      * @return code for what kind of statement it was
      */
-    public int scan(String line,String[] ops){
+    public String scan(int index,ArrayList<String> block){
+        String[] ops = {"","",""}; //[lop,op,rop]
+        String line = block.get(index);
+        int type=0;
         for(int i=0;i<line.length();i++){ //retrieve statement logic
             if(line.charAt(i)=='<'){
                 ops[1] = "<";
@@ -602,20 +593,44 @@ public class Compiler {
                 else
                     ops[2]+=line.charAt(i);
                 if(ops[0].equals("if ")||ops[0].equals("if(")){ //if statement
-                    analyze(line.substring(i));
-                    return 1; 
+                    ops[1] = analyze(line.substring(i));
+                    type= 1;
+                    break;
                 }else if(ops[0].equals("elif ")||ops[0].equals("elif(")){ //elif statement
-                    analyze(line.substring(i));
-                    return 2;
+                    ops[1] = analyze(line.substring(i));
+                    type= 2;
+                    break;
                 }else if(ops[0].equals("else")){ //else statement
-                    return 3;
+                    type= 3;
+                    break;
                 }else if(ops[0].equals("begin")){ //begin statement
-                    return -1;
-                }else if(ops[0].equals("end")) //end statement
-                    return -1;
+                    type= -1;
+                    break;
+                }else if(ops[0].equals("end")){ //end statement
+                    type= -1;
+                    break;
+                }
             }
         }
-        return 0; //'assign' statement
+        switch(type){
+                case 0: //'assign' statement
+                    if(ops[1].equals("="))
+                        ;
+                    break;
+                case 1: //if block
+                    //Loop this if there are multiple.
+                    index++;
+                    String out = scan(index,block); //scan line inside of 'if' block.
+                    //create MUX for 'a=b' statement, with 'a' as output, 'b' as data1, ops[1] as select; 'elsel will be data0
+                    break;
+                case 2: //elif block
+                    break;
+                case 3: //else block
+                    break;
+                case -1: //begin/end statement
+                    break;
+            }
+        return null;
     }
     
     /**
@@ -660,8 +675,10 @@ public class Compiler {
                     rop+=line.charAt(i);
             }
         }
-        //DO STUFF BASED ON LOP,OP,ROP
-        return null;
+        //Create Wires and Parts to match the 'if' logic
+        Wire wire = new Wire("MISC"+numWires,1);
+        numWires++;
+        return wire.name; //return name of output wire
     }
     
     public String not(ArrayList<String> myNotStatement){
