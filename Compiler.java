@@ -79,7 +79,7 @@ public class Compiler {
                     tempIO = new String[size];
                     tempIO = code.get(i).substring(a+1,b).split("\\,");
                 }
-                if(code.get(i).length() > 7){
+                if(code.get(i).length() > 8){
                     if(code.get(i).substring(0,9).equals("endmodule")){
                         end = i;
                     }
@@ -153,23 +153,25 @@ public class Compiler {
                     //compile an 'always' block
                     else if(code.get(i).substring(0,6).equals("always")){
                         ArrayList<String> myAlways = new ArrayList<String>();
-                        boolean done = false;
-                        while(!done){
-                            if(!code.get(i).isEmpty() && code.get(i).length() > 2){
-                                if(!code.get(i).substring(0,3).equals("end")){
-                                    myAlways.add(code.get(i));
-                                    i++;
-                                }
-                                else
-                                    done=true;
-                            }
-                            else{
-                                myAlways.add(code.get(i));
-                                i++;
-                            }
-                        }
+                        int count=0;
                         myAlways.add(code.get(i));
                         i++;
+                       do{
+                            if(!code.get(i).isEmpty()){
+                                if(code.get(i).length() > 2){
+                                    if(code.get(i).substring(0,3).equals("end"))
+                                    count--;
+                                }
+                                if(code.get(i).length() > 4){
+                                    if(code.get(i).substring(0,5).equals("begin"))
+                                    count++;
+                                }
+
+                                myAlways.add(code.get(i));
+                            }
+                            i++;
+                        }while(count>0);
+                       
                         always(myAlways);
                     }
                     else{
@@ -563,20 +565,12 @@ public class Compiler {
                 clk+=line.charAt(i);
             }
         }
-        String[] ifData=null;
+        
         for (int j=1;j<block.size();j++) { //go through the rest of the block
-            String[] temp=scan(j,block);
-            if(temp[0].equals("if"))
-                ifData = temp; //store names of muxs for impending else
-            else if(temp[0].equals("else")){
-                String[] temp2 = temp[1].split("\\,");
-                String[] temp3 = ifData[1].split("\\,");
-                for(int k=0;k<temp.length;k++){ //do this for every statement in the else
-                    for(Part part:currModule.parts){
-                        if(part.name.equals(temp3[k]))
-                            currModule.getWire(temp2[k]).addPort(part.ports.get(0));
-                    }
-                }
+            ArrayList<String> output = scan(j,block);
+            for(int k=0;k<output.size();k+=2){
+                if(output.size()>1)
+                    assign(output.get(k-1)+"="+output.get(k)+";");
             }
         }
         return null;
@@ -588,87 +582,107 @@ public class Compiler {
      * @param block list of lines in the always block
      * @return code for what kind of statement it was
      */
-    public String[] scan(int index,ArrayList<String> block){
+    public ArrayList<String> scan(int index,ArrayList<String> block){
         String[] ops = {"","",""}; //[lop,op,rop]
         String line = block.get(index);
-        String[] out = null;
+        String out = null;
         int type=0;
-        for(int i=0;i<line.length();i++){ //retrieve statement logic
-            if(line.charAt(i)=='<'){
-                ops[1] = "<";
-            }else if(line.charAt(i)=='='){
-                ops[1]+="=";
-            }else if(line.charAt(i)==';'){
-                break;
-            }else if(line.charAt(i)!=' '){
-                if(ops[1].equals(""))
-                    ops[0]+=line.charAt(i);
-                else
-                    ops[2]+=line.charAt(i);
-                if(ops[0].equals("if ")||ops[0].equals("if(")){ //if statement
-                    ops[1] = analyze(line.substring(i));
-                    type= 1;
+        int i;
+        
+        if(line.length()>=3){
+            if(line.substring(0,3).equals("if ")||line.substring(0,3).equals("if(")){
+                ops[1]=line.substring(2);
+                type=1;
+            }
+        }if(line.length()>=7){
+            if(line.substring(0,8).equals("else if ")||line.substring(0,8).equals("else if(")){
+                ops[1]=line.substring(7);
+                type=2;
+            }
+            //break;
+        }if(line.length()>=7){
+            if(line.substring(0,7).equals("endcase"))
+                type=-3;
+        }if(line.length()>=4){
+            if(line.substring(0,4).equals("else")){
+                type=3;
+            }
+        }if(line.length()>=5){
+            if(line.substring(0,5).equals("begin")){
+                type=-1;
+            }
+        }if(line.length()>=3){
+            if(line.substring(0,3).equals("end"))
+                type=-2;
+        }if(line.length()>=4){
+            if(line.substring(0,4).equals("case")){
+                ops[1]=line.substring(4);
+                type=4;
+            }
+        }if(type==0){
+        
+            for(i=0;i<line.length();i++){ //retrieve statement logic
+                if(line.charAt(i)==';'){
                     break;
-                }else if(ops[0].equals("elif ")||ops[0].equals("elif(")){ //elif statement
-                    ops[1] = analyze(line.substring(i));
-                    type= 2;
+                }else if(line.charAt(i)=='='){
+                    ops[1]=line.substring(i+1);
                     break;
-                }else if(ops[0].equals("else")){ //else statement
-                    type= 3;
-                    break;
-                }else if(ops[0].equals("begin")){ //begin statement
-                    type= -1;
-                    break;
-                }else if(ops[0].equals("end")){ //end statement
-                    type= -2;
-                    break;
+                }else if(line.charAt(i)==39){ // '
+                    ops[1]="'";
+                }else if(line.charAt(i)==':'){
+                    type=4;
+                }else if(line.charAt(i)!=' '){
+                    if(ops[1].equals(""))
+                        ops[0]+=line.charAt(i);
+                    else
+                        ops[2]+=line.charAt(i);
                 }
             }
         }
+        ArrayList<String> list = new ArrayList<>();
+        Wire wire;
         switch(type){
-                case 0: //'assign' statement
-                    if(ops[1].equals("="))
-                        ; //create the connection
-                    return ops;
-                case 1: //if block
-                    String temp="";
+            case 0: //'assign' statement
+                wire = new Wire("MISC"+numWires,1);
+                numWires++;
+                currModule.wires.add(wire);
+                assign(wire.name+"="+ops[1]+";");
+                list.add(wire.name);
+                list.add(ops[0]);
+                return list; //{output wire name, 'true' output wire name}
+                
+            case 1: //if block
+                index+=2;
+                ArrayList<String>temp = scan(index,block);
+                while(!temp.get(0).equals("end")){
+                    list.addAll(temp);
+                    wire = new Wire("MISC"+numWires,1);
+                    numWires++;
+                    currModule.wires.add(wire);
+                    assign(wire.name+" = "+ops[1]+" ? "+temp.get(0)+" : "+0+";");
                     index++;
-                    out = scan(index,block); //for 'assign' statement, out=[a,op,b]
-                    if(out[0].equals("begin")) //there are multiple statements inside the if
-                        do{
-                            index++;
-                            out = scan(index,block);
-                            
-                            //create MUX for 'a=b' statement, with 'a' as output, 'b' as data1, ops[1] as select; 'else' will be data0
-                            Mux mux = new Mux("MISC"+numMuxs);
-                            numMuxs++;
-                            currModule.getWire(out[2]).addPort(mux.ports.get(1));
-                            currModule.getWire(out[0]).addPort(mux.ports.get(3));
-                            currModule.getWire(ops[1]).addPort(mux.ports.get(2));
-                            temp+=mux.name+",";
-                        }while(!out[0].equals("end"));
-                    else{ //there is only one statement inside the if
-                        
-                        //create MUX for 'a=b' statement, with 'a' as output, 'b' as data1, ops[1] as select; 'else' will be data0
-                        Mux mux = new Mux("MISC"+numMuxs);
-                        numMuxs++;
-                        currModule.getWire(out[2]).addPort(mux.ports.get(1));
-                        currModule.getWire(out[0]).addPort(mux.ports.get(3));
-                        currModule.getWire(ops[1]).addPort(mux.ports.get(2));
-                        temp+=mux.name+",";
-                    }
-                    
-                    return new String[]{"if",temp}; //return "if" and names of new muxs
-                case 2: //elif block
-                    
-                    
-                    return new String[]{"elif"};
-                case 3: //else block
-                    return new String[]{"else",""}; //return 'else' and name of output wires
-                case -1: //begin statement
-                    return new String[]{"begin"};
-                case -2:
-                    return new String[]{"end"};
+                    temp = scan(index,block);
+                }
+                return list; //{output wire name, 'true' output wire name,...}
+            
+            case 2: //else if block
+                
+                
+                return list; //{output wire name, 'true' output wire name,...}
+                
+            case 3: //else block
+                
+            case 4: //case block
+                
+            case -1: //begin statement
+                list.add("begin");
+                return list;
+            case -2: //end statement
+                list.add("end");
+                return list;
+            case -3: //endcase statement
+                list.add("endcase");
+                return list;
             }
         return null;
     }
@@ -676,7 +690,7 @@ public class Compiler {
     /**
      * Second helper method to always (takes in 'if' logic)
      * @param line 
-     * @return name of output node created or something
+     * @return name of output node created
      */
     public String analyze(String line){
         String lop="";
@@ -696,6 +710,7 @@ public class Compiler {
                     lop = analyze(line.substring(i+1,j-1));
                 else
                     rop = analyze(line.substring(i+1,j-1));
+                i=j-1;
             }else if(line.charAt(i)=='<'){
                 op += "<";
             }else if(line.charAt(i)=='>'){
@@ -716,7 +731,8 @@ public class Compiler {
             }
         }
         //Create Wires and Parts to match the 'if' logic
-        Wire wire = new Wire("MISC"+numWires,1);
+        Wire wire = new Wire("MISC"+numWires,1); //DUMMY WIRE
+        currModule.wires.add(wire);
         numWires++;
         return wire.name; //return name of output wire
     }
