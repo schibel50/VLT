@@ -36,6 +36,8 @@ public class Compiler {
     public int numMultipliers;
     public int numDividers;
     
+    //static final char q = Character.char();
+    
     public Compiler(ArrayList<String> code){
         //initialize everything
         this.code=code;
@@ -565,9 +567,9 @@ public class Compiler {
                 clk+=line.charAt(i);
             }
         }
-        
-        for (int j=1;j<block.size();j++) { //go through the rest of the block
-            ArrayList<String> output = scan(j,block);
+        block.remove(0);
+        while (block.size()>0) { //go through the rest of the block
+            ArrayList<String> output = scan(0,block,null);
             for(int k=0;k<output.size();k+=2){
                 if(output.size()>1)
                     assign(output.get(k-1)+"="+output.get(k)+";");
@@ -580,9 +582,10 @@ public class Compiler {
      * Helper method to always
      * @param index 
      * @param block list of lines in the always block
+     * @param ifLogic conditional from if; used for else if or else
      * @return code for what kind of statement it was
      */
-    public ArrayList<String> scan(int index,ArrayList<String> block){
+    public ArrayList<String> scan(int index,ArrayList<String> block,String ifLogic){
         String[] ops = {"","",""}; //[lop,op,rop]
         String line = block.get(index);
         String out = null;
@@ -597,9 +600,12 @@ public class Compiler {
         }if(line.length()>=7){
             if(line.substring(0,8).equals("else if ")||line.substring(0,8).equals("else if(")){
                 ops[1]=line.substring(7);
-                type=2;
+                type=1;
             }
             //break;
+        }if(line.length()>=3){
+            if(line.substring(0,3).equals("end"))
+                type=-2;
         }if(line.length()>=7){
             if(line.substring(0,7).equals("endcase"))
                 type=-3;
@@ -611,74 +617,145 @@ public class Compiler {
             if(line.substring(0,5).equals("begin")){
                 type=-1;
             }
-        }if(line.length()>=3){
-            if(line.substring(0,3).equals("end"))
-                type=-2;
         }if(line.length()>=4){
             if(line.substring(0,4).equals("case")){
                 ops[1]=line.substring(4);
                 type=4;
             }
         }if(type==0){
-        
+            int j=0;
             for(i=0;i<line.length();i++){ //retrieve statement logic
                 if(line.charAt(i)==';'){
                     break;
                 }else if(line.charAt(i)=='='){
                     ops[1]=line.substring(i+1);
                     break;
-                }else if(line.charAt(i)==39){ // '
-                    ops[1]="'";
+                }else if(line.charAt(i)==39){
+                    type=2;
+                    j=1;
                 }else if(line.charAt(i)==':'){
-                    type=4;
+                    type=2;
+                    ops[2]=line.substring(i+1);
+                    break;
                 }else if(line.charAt(i)!=' '){
-                    if(ops[1].equals(""))
-                        ops[0]+=line.charAt(i);
-                    else
-                        ops[2]+=line.charAt(i);
+                    ops[j]+=line.charAt(i);
                 }
             }
         }
         ArrayList<String> list = new ArrayList<>();
+        ArrayList<String> temp;
+        ArrayList<String> list2; //for else block statements
+        ArrayList<String> list3 = new ArrayList<>();
         Wire wire;
         switch(type){
             case 0: //'assign' statement
-                wire = new Wire("MISC"+numWires,1);
+                wire = new Wire("MISC"+numWires,currModule.getWire(ops[0]).size);
                 numWires++;
                 currModule.wires.add(wire);
                 assign(wire.name+"="+ops[1]+";");
                 list.add(wire.name);
                 list.add(ops[0]);
+                block.remove(index);
                 return list; //{output wire name, 'true' output wire name}
                 
-            case 1: //if block
-                index+=2;
-                ArrayList<String>temp = scan(index,block);
+            case 1: //if block or else if block
+                block.remove(index+1); //remove 'begin'
+                temp = scan(index+1,block,ops[1]);
                 while(!temp.get(0).equals("end")){
                     list.addAll(temp);
-                    wire = new Wire("MISC"+numWires,1);
-                    numWires++;
-                    currModule.wires.add(wire);
-                    assign(wire.name+" = "+ops[1]+" ? "+temp.get(0)+" : "+0+";");
-                    index++;
-                    temp = scan(index,block);
+                    temp = scan(index+1,block,ops[1]);
                 }
-                return list; //{output wire name, 'true' output wire name,...}
-            
-            case 2: //else if block
                 
+                list2 = scan(index+1,block,ops[1]); //for else/else if
                 
-                return list; //{output wire name, 'true' output wire name,...}
+                for(int k=0;k<list.size();k+=2){
+                    if(list.size()>1){
+                        int m; String ifFalse=null;
+                        for(m=0;ifFalse==null;m+=2){
+                            if(m>=list2.size()){
+                                ifFalse="gnd";
+                            }else if(list2.get(m+1).equals(list.get(k+1))){
+                                ifFalse=list2.get(m);
+                                list2.remove(m);
+                                list2.remove(m);
+                            }
+                        }
+                        wire = new Wire("MISC"+numWires,currModule.getWire(list.get(k+1)).size);
+                        numWires++;
+                        currModule.wires.add(wire);
+                        list3.add(assign(wire.name+" = "+ops[1]+" ? "+list.get(k)+" : " + ifFalse + ";"));
+                        list3.add(list.get(k+1));
+                    }
+                }
+                
+                for(int k=0;k<list2.size();k+=2){
+                    if(list.size()>1){
+                        wire = new Wire("MISC"+numWires,currModule.getWire(list2.get(k+1)).size);
+                        numWires++;
+                        currModule.wires.add(wire);
+                        list3.add(assign(wire.name+" = "+ops[1]+" ? gnd : " + list2.get(k) + ";"));
+                        list3.add(list2.get(k+1));
+                    }
+                }
+                
+                block.remove(index);
+                return list3; //{output wire name, 'true' output wire name,...}
                 
             case 3: //else block
+                block.remove(index+1); //remove 'begin'
+                temp = scan(index+1,block,null);
+                while(!temp.get(0).equals("end")){
+                    list.addAll(temp);
+                    temp = scan(index+1,block,null);
+                }
                 
+                block.remove(index);
+                return list;
             case 4: //case block
+                ArrayList<String> odds = new ArrayList<>();
+                ArrayList<String> evens = new ArrayList<>();
+                temp = scan(index+1,block,null);
+                while(!temp.get(0).equals("endcase")){
+                    list.addAll(temp);
+                    temp = scan(index+1,block,null);
+                }
                 
+                block.add(index+1,"end");
+                temp.remove(0);
+                for(String str:temp){
+                    block.add(index+1,str);
+                }
+                block.add(index+1,"begin");
+                block.add(index+1,"else");
+                block.add(index+1,"end");
+                for(String str:temp){
+                    block.add(index+1,str);
+                }
+                block.add(index+1,"begin");
+                block.add(index+1,"if ()");
+                
+            
+                block.remove(index);
+                return list3;
+            case 2: //a 'case' in a case block
+                //ops={1,b0,statement}
+                list.add("`" + numberMaker(ops[1]));
+                block.set(index,ops[2]);
+                String str = block.remove(index);
+                if(str.isEmpty()||str.equals(" "))
+                    while(!str.equals("end")){
+                        list.add(str);
+                        str = block.remove(index);
+                    }
+                list.add(str);
+                return list; //{case id,WHOLE STATEMENTS...}
             case -1: //begin statement
                 list.add("begin");
+                block.remove(index);
                 return list;
             case -2: //end statement
                 list.add("end");
+                block.remove(index);
                 return list;
             case -3: //endcase statement
                 list.add("endcase");
@@ -686,55 +763,20 @@ public class Compiler {
             }
         return null;
     }
-    
     /**
-     * Second helper method to always (takes in 'if' logic)
-     * @param line 
-     * @return name of output node created
+     * convert number in 1b'0 format to an integer
+     * @param in
+     * @return the integer
      */
-    public String analyze(String line){
-        String lop="";
-        String op ="";
-        String rop="";
-        for(int i=0;i<line.length();i++){ //retrieve statement logic
-            if(line.charAt(i)=='('){
-                int j=i+1,count=1;
-                while(count>0){
-                    if(line.charAt(j)=='(')
-                        count++;
-                    else if(line.charAt(j)==')')
-                        count--;
-                    j++;
-                }
-                if(op.equals(""))
-                    lop = analyze(line.substring(i+1,j-1));
-                else
-                    rop = analyze(line.substring(i+1,j-1));
-                i=j-1;
-            }else if(line.charAt(i)=='<'){
-                op += "<";
-            }else if(line.charAt(i)=='>'){
-                op += ">";
-            }else if(line.charAt(i)=='='){
-                op+="=";
-            }else if(line.charAt(i)=='&'){
-                op+="&";
-            }else if(line.charAt(i)=='|'){
-                op+="|";
-            }else if(line.charAt(i)=='!'){
-                op+="=";
-            }else if(line.charAt(i)!=' '){
-                if(op.equals(""))
-                    lop+=line.charAt(i);
-                else
-                    rop+=line.charAt(i);
-            }
+    public int numberMaker(String in){
+        int total=0;
+        in = in.substring(1);
+        char[] digits = in.toCharArray();
+        for(int j=0;j<digits.length;j++){
+            if(digits[j]==0x31)
+                total+=Math.pow(2,digits.length-j-1);
         }
-        //Create Wires and Parts to match the 'if' logic
-        Wire wire = new Wire("MISC"+numWires,1); //DUMMY WIRE
-        currModule.wires.add(wire);
-        numWires++;
-        return wire.name; //return name of output wire
+        return total;
     }
     
     public String not(ArrayList<String> myNotStatement){
