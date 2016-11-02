@@ -9,12 +9,10 @@ package vlt;
  *
  * @author Parker
  */
-public class BitShiftL extends Part{
-    public int amount;
-    public BitShiftL(String name, int amount){
+public class N_Inverter extends Part{
+    public N_Inverter(String name){
         super(name);
-        this.amount = amount;
-        ports.add(new Port("in",this));
-        ports.add(new Port("out",this));
+        ports.add(new Port("a",this));
+        ports.add(new Port("b",this));
     }
 }

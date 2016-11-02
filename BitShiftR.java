@@ -10,8 +10,11 @@ package vlt;
  * @author Parker
  */
 public class BitShiftR extends Part{
-    public BitShiftR(String name){
+    public int amount;
+    
+    public BitShiftR(String name, int amount){
         super(name);
+        this.amount = amount;
         ports.add(new Port("in",this));
         ports.add(new Port("out",this));
     }

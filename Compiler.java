@@ -16,12 +16,45 @@ import java.lang.Boolean;
 public class Compiler {
     public ArrayList<String> code;
     public ArrayList<Module> modules;
+    public String[] preDefinedMods = {"and","or","xor","nand","nor","xnor","buf","not","bufif1","bufif0","notif1","notif0"};
     public Module currModule;
     public EWriter edif;
     //http://www.asic-world.com/verilog/operators.html
     //DONE
     public String[] operators = {"+","-",">=","<=",">","<","==","!=","!","?",":","*","&","|","^","~","&&","||","~&","~|","~^","^~"};
     //TODO
+    //concatenation
+        //create a new case in the statement creator - DONE,TEST - 10/26,10/28
+        //create a new concatentation part - DONE,TEST - 10/27,10/28
+        //use new breakdown method to connect - DONE,TEST - 10/28,10/28
+    //preset logic modules
+        //create list of preset names - DONE
+        //create part using N_AND,N_OR,etc... - AND Done,Test - 10/28,10/28
+                                            //- OR,XOR,NAND,NOR,XNOR,BUF,NOT DONE,TEST - 10/28,10/28
+                                            //Still - TODO - All tri-state buffers - 10/28
+    //bit shift
+        //create new breakdown method - Completed Bit Shift Right, Need to verify functionality - DONE,TEST - 10/28
+    //set up wire=reg
+        //don't fuck this up - DONE,TEST - 10/26, 10/28
+    //blank io module calls
+        //check to see if number of inputs given are correct - DONE,TEST - 10/28,10/28
+        //if not, preset to GND or leave as floating point - DONE,TEST - 10/28,10/28
+    //inverting entire vectors
+        //fix not method so output wire saves bit size - DONE,TEST - 10/26, 10/28
+        //create INV breakdown method - DONE,TEST - 10/26, 10/28
+    //2 parens in parens
+        //Example: ((a+b) + (c+d)) - DONE,TEST - 10/26, 10/28(w/bugs) - Fix adder to adder problem - 10/28, update: set constraint that no multiple addition(i.e. in1+in2+in3, limit to in1+in2), use suggested module to allow addition of multiple vectors such as in1+in2+in3
+        //count until correct close parens is found - DONE,TEST - 10/26, 10/28(w/bugs)
+    //individual bits
+        //use splitters and combiners - DONE,TEST
+        //assign wires to splitter/combiner ports - DONE,TEST - 10/26,10/28
+        //make sure to check first. If you do find one - DONE,TEST - 10/26,10/28
+        //assign new wire to splitter/combiner and put name of  - DONE,TEST - 10/26,10/28
+        //wire back into statement - DONE,TEST - 10/26,10/28
+        //at the end, complete in SplitBD/CombineBD statement - DONE,TEST - 10/28,10/28
+    //Buffers
+        //add in buffer parts - DONE,TEST - 10/28,10/28
+        //automatically add in buffers for all final outputs
     public String[] operators2 = {">>","<<","%","/"};
         
     public int numWires;
@@ -38,6 +71,12 @@ public class Compiler {
     public int numXNORs;
     public int numMultipliers;
     public int numDividers;
+    public int numConcats;
+    public int numBuffs;
+    public int numBSRs;
+    public int numBSLs;
+    public int numSplitters;
+    public int numCombiners;
     
     public Wire GND;
     public Wire VCC;
@@ -60,6 +99,12 @@ public class Compiler {
         numXNORs=0;
         numMultipliers=0;
         numDividers=0;
+        numConcats=0;
+        numBuffs=0;
+        numBSRs=0;
+        numBSLs=0;
+        numSplitters=0;
+        numCombiners=0;
     }
     
     public void moduleFinder(){
@@ -107,6 +152,12 @@ public class Compiler {
     }
     
     public void compile(){
+        modules.get(0).wires.add(new Wire("gnd",1));
+        modules.get(0).wires.get(modules.get(0).wires.size()-1).ports.add(new Port("GND",(byte)1));
+        GND = modules.get(0).wires.get(modules.get(0).wires.size()-1);
+        modules.get(0).wires.add(new Wire("vcc",1));
+        modules.get(0).wires.get(modules.get(0).wires.size()-1).ports.add(new Port("VCC",(byte)1));
+        VCC = modules.get(0).wires.get(modules.get(0).wires.size()-1);
         for(int j = 0; j < modules.size(); j++){
             currModule = modules.get(j);
             for(int i=currModule.start; i<currModule.end; i++){
@@ -121,6 +172,8 @@ public class Compiler {
                                 String[] temp = code.get(i).substring(6).split("\\,");
                                 for(int k = 0; k < temp.length; k++)
                                     temp[k] = temp[k].trim();
+                                if(temp[temp.length-1].charAt(temp[temp.length-1].length()-1)==';');
+                                    temp[temp.length-1]=temp[temp.length-1].substring(0,temp[temp.length-1].length()-1);
                                 currModule.addInputs(temp,1);
                             }
                         }
@@ -136,14 +189,17 @@ public class Compiler {
                                 String[] temp = code.get(i).substring(7).split("\\,");
                                 for(int k = 0; k < temp.length; k++)
                                     temp[k] = temp[k].trim();
+                                if(temp[temp.length-1].charAt(temp[temp.length-1].length()-1)==';');
+                                    temp[temp.length-1]=temp[temp.length-1].substring(0,temp[temp.length-1].length()-1);
                                 currModule.addOutputs(temp,1);
                             }
                         }
                         else
                             ioHelper(code.get(i),2);
                     }
-                    //add all the predefined wires
-                    else if(code.get(i).substring(0,4).equals("wire") && code.get(i).length() > 3){
+                    //add all the predefined wires and regs
+                    //TEST
+                    else if(code.get(i).substring(0,4).equals("wire") && code.get(i).length() > 4){
                         if(code.get(i).substring(4,5).equals(" ")){
                             if(code.get(i).charAt(5)=='[')
                                 ioHelper(code.get(i),3);
@@ -151,6 +207,24 @@ public class Compiler {
                                 String[] temp = code.get(i).substring(5).split("\\,");
                                 for(int k = 0; k < temp.length; k++)
                                     temp[k] = temp[k].trim();
+                                if(temp[temp.length-1].charAt(temp[temp.length-1].length()-1)==';');
+                                    temp[temp.length-1]=temp[temp.length-1].substring(0,temp[temp.length-1].length()-1);
+                                currModule.addWires(temp,1);
+                            }
+                        }
+                        else
+                            ioHelper(code.get(i),3);
+                    }
+                    else if(code.get(i).substring(0,3).equals("reg") && code.get(i).length() > 3){
+                        if(code.get(i).substring(3,4).equals(" ")){
+                            if(code.get(i).charAt(4)=='[')
+                                ioHelper(code.get(i),3);
+                            else{
+                                String[] temp = code.get(i).substring(4).split("\\,");
+                                for(int k = 0; k < temp.length; k++)
+                                    temp[k] = temp[k].trim();
+                                if(temp[temp.length-1].charAt(temp[temp.length-1].length()-1)==';');
+                                    temp[temp.length-1]=temp[temp.length-1].substring(0,temp[temp.length-1].length()-1);
                                 currModule.addWires(temp,1);
                             }
                         }
@@ -218,6 +292,31 @@ public class Compiler {
                                 currModule.parts.add(new Module_Part(modName,tempPorts));
                             }
                         }
+                        for(int k = 0; k < preDefinedMods.length; k++){
+                            if(preDefinedMods[k].equals(modName)){
+                                String tempName = "";
+                                while(code.get(i).charAt(a)==' ')
+                                    a++;
+                                while(code.get(i).charAt(a)!='('){
+                                    tempName+=code.get(i).charAt(a);
+                                    a++;
+                                }
+                                int size = 1;
+                                int b=a;
+                                while(code.get(i).charAt(b)!=')'){
+                                    if(code.get(i).charAt(b)==',')
+                                        size++;
+                                    b++;
+                                }
+                                String[] tempPorts = code.get(i).substring(a+1,b).split("\\,");
+                                for(int l = 0; l < tempPorts.length;l++){
+                                    if(tempPorts[l] == null)
+                                        tempPorts[l] = "";
+                                    tempPorts[l] = tempPorts[l].trim();
+                                }
+                                preMod(tempPorts,k);
+                            }
+                        }
                     }
                 }
             }
@@ -226,14 +325,12 @@ public class Compiler {
             insertMod(modules.get(i-1));
         }
         currModule = modules.get(0);
-        bit2bits(currModule);
-        currModule.wires.add(new Wire("GND",1));
-        currModule.wires.get(currModule.wires.size()-1).ports.add(new Port("GND",(byte)1));
-        GND = currModule.wires.get(currModule.wires.size()-1);
-        currModule.wires.add(new Wire("VCC",1));
-        currModule.wires.get(currModule.wires.size()-1).ports.add(new Port("VCC",(byte)1));
-        VCC = currModule.wires.get(currModule.wires.size()-1);
+//        bit2bits(currModule);
         part2gate(currModule);
+        /*for(int j = 0; j < currModule.wires.size(); j++){
+            if(currModule.wires.get(j).ports.size()==0)
+                currModule.wires.remove(j);
+        }*/
         edif = new EWriter(modules.get(0));
         edif.write();
     }
@@ -258,383 +355,615 @@ public class Compiler {
         finalSize = (size[0]-size[1])+1;
         while(io.charAt(a) == ' ')
             a++;
+        
         switch(ioType){
             case 1:
-                currModule.addInputs(io.substring(a).split("\\,"), finalSize);
+                String[] tempI = io.substring(a).split("\\,");
+                for(int k = 0; k < tempI.length; k++)
+                    tempI[k] = tempI[k].trim();
+                if(tempI[tempI.length-1].charAt(tempI[tempI.length-1].length()-1)==';');
+                    tempI[tempI.length-1]=tempI[tempI.length-1].substring(0,tempI[tempI.length-1].length()-1);
+                currModule.addInputs(tempI, finalSize);
+//                int spotI = currModule.wires.size();
+//                for(int i = 0; i < tempI.length; i++)
+//                    split(currModule.wires.get(spotI-(tempI.length-i)),finalSize);
                 break;
             case 2:
-                currModule.addOutputs(io.substring(a).split("\\,"), finalSize);
+                String[] tempO = io.substring(a).split("\\,");
+                for(int k = 0; k < tempO.length; k++)
+                    tempO[k] = tempO[k].trim();
+                if(tempO[tempO.length-1].charAt(tempO[tempO.length-1].length()-1)==';');
+                    tempO[tempO.length-1]=tempO[tempO.length-1].substring(0,tempO[tempO.length-1].length()-1);
+                currModule.addOutputs(tempO, finalSize);
+//                int spotO = currModule.wires.size();
+//                for(int i = 0; i < tempO.length; i++)
+//                    combine(currModule.wires.get(spotO-(tempO.length-i)),finalSize);
                 break;
             case 3:
-                currModule.addWires(io.substring(a).split("\\,"), finalSize);
+                String[] tempW = io.substring(a).split("\\,");
+                for(int k = 0; k < tempW.length; k++)
+                    tempW[k] = tempW[k].trim();
+                if(tempW[tempW.length-1].charAt(tempW[tempW.length-1].length()-1)==';');
+                    tempW[tempW.length-1]=tempW[tempW.length-1].substring(0,tempW[tempW.length-1].length()-1);
+                currModule.addWires(tempW, finalSize);
+//                int spotW = currModule.wires.size();
+//                for(int i = 0; i < tempW.length; i++){
+//                    split(currModule.wires.get(spotW-(tempW.length-i)),finalSize);
+//                    combine(currModule.wires.get(spotW-(tempW.length-i)),finalSize);
+//                }
                 break;
         }
+    }
+    
+    public void preMod(String[] myPorts, int myMod){
+        String type="";
+        Wire[] myWires = new Wire[myPorts.length];
+        for(int i = 0; i < myPorts.length; i++){
+            for(Wire wire : currModule.wires){
+                for(Port port : wire.ports){
+                    if(port.name.equals(myPorts[i]))
+                        myWires[i] = wire;
+                }
+            }
+        }
+        switch(myMod){
+            case 0:
+                type="&";
+                break;
+            case 1:
+                type="|";
+                break;
+            case 2:
+                type="^";
+                break;
+            case 3:
+                type="~&";
+                break;
+            case 4:
+                type="~|";
+                break;
+            case 5:
+                type="~^";
+                break;
+        }
+        if(myMod < 6){
+            String tempAssign=myWires[0].name+" = ";
+            tempAssign+=myWires[1].name;
+            for(int i = 2; i < myWires.length; i++){
+                tempAssign+=" "+type+" "+myWires[i].name;
+            }
+            tempAssign+=";";
+            assign(tempAssign);
+        }
+        else if(myMod==6){
+            Buffer newBuff = new Buffer("Buff"+numBuffs);
+            numBuffs++;
+            myWires[myWires.length-1].ports.add(newBuff.ports.get(0));
+            for(int i = 0; i < myWires.length-1;i++)
+                myWires[i].ports.add(newBuff.ports.get(1));
+            currModule.parts.add(newBuff);
+        }
+        else if(myMod==7){
+            Inverter newInv = new Inverter("INV"+numInverters);
+            numInverters++;
+            myWires[myWires.length-1].ports.add(newInv.ports.get(0));
+            for(int i = 0; i < myWires.length-1;i++)
+                myWires[i].ports.add(newInv.ports.get(1));
+            currModule.parts.add(newInv);
+        }
+//        else if(myMod==8){
+//            Buffer newBuff = new Buffer("Buff"+numBuffs);
+//            numBuffs++;
+//            AND newAnd = new AND("AND"+numANDs);
+//            numANDs++;
+//            currModule.parts.add(newBuff);
+//            currModule.parts.add(newAnd);
+//        }
+//        else if(myMod==9){
+//            
+//        }
     }
     
     public String assign(String statement){
         //get the wire we are assigning to
         int a = 0;
+        int singleBit = -1;
+        int c = 0;
         Wire left = null;
-        while(statement.charAt(a)!=' '&&statement.charAt(a)!='=')
-            a++;
-        for(Wire wire : currModule.wires){
-            if(wire.name.equals(statement.substring(0,a)))
-                left = wire;
+        while(statement.charAt(a)!=' '&&statement.charAt(a)!='='){
+            if(statement.charAt(a)=='['){
+                c = a;
+                while(statement.charAt(c)!=']')
+                    c++;
+                singleBit = Integer.parseInt(statement.substring(a+1,c));
+                c=a;
+                a++;
+            }
+            else
+               a++;
         }
-        //break up each expression and connect to operator
-        ArrayList<String> myStatements = new ArrayList<String>();
-        ArrayList<Boolean> finStatements = new ArrayList<Boolean>();
-        //get to the start of the right side of the equation
-        while(statement.charAt(a)==' '||statement.charAt(a)=='=')
-            a++;
-        
-        //go through the right side of the equation and add to the Arraylist
-        //until the ; is reached
-        String temp = null;
-        while(statement.charAt(a)!=';'){
-            switch(statement.charAt(a)){
-                case ' ':
-                    if(temp != null){
-                        myStatements.add(temp);
-                        finStatements.add(Boolean.FALSE);
-                        temp=null;
-                    }
-                    break;
-                case '(':
-                    myStatements.add("" + statement.charAt(a));
-                    finStatements.add(Boolean.FALSE);
-                    break;
-                case ')':
-                    if(temp!=null){
-                        myStatements.add(temp);
-                        finStatements.add(Boolean.FALSE);
-                        temp=null;
-                    }
-                    myStatements.add("" + statement.charAt(a));
-                    finStatements.add(Boolean.FALSE);
-                    break;
-                case '>':
-                    if(statement.charAt(a+1)=='='){
-                        myStatements.add(statement.substring(a,a+2));
-                        finStatements.add(Boolean.FALSE);
-                        a++;
-                    }
-                    else{
+        if(singleBit == -1){
+            int size=0;
+            for(Wire wire : currModule.wires){
+                if(wire.name.equals(statement.substring(0,a)))
+                    size++;
+            }
+            currModule.wires.add(new Wire("MISC"+numWires,size));
+            numWires++;
+            left=currModule.wires.get(currModule.wires.size()-1);
+            for(Wire wire : currModule.wires){
+                if(wire.name.equals(statement.substring(0,a)))
+                    
+            }
+        }
+        else{
+            for(Wire wire : currModule.wires){
+                if(wire.name.equals(statement.substring(0,c)+"_"+singleBit)){
+                    left = wire;
+                }
+            }
+//            for(Part part : currModule.parts){
+//                if(part instanceof Combiner && part.name.contains(statement.substring(0,c))){
+//                    for(Wire wire : currModule.wires){
+//                        for(Port port : wire.ports){
+//                            if(port.part!=null){
+//                                if(port.name.equals(part.name+"-"+singleBit))
+//                                    left=wire;
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+        }
+        if(!(left.name.equals("gnd")||left.name.equals("vcc"))){
+            //break up each expression and connect to operator
+            ArrayList<String> myStatements = new ArrayList<String>();
+            ArrayList<Boolean> finStatements = new ArrayList<Boolean>();
+            //get to the start of the right side of the equation
+            while(statement.charAt(a)==' '||statement.charAt(a)=='=')
+                a++;
+
+            //go through the right side of the equation and add to the Arraylist
+            //until the ; is reached
+            String temp = null;
+            while(statement.charAt(a)!=';'){
+                switch(statement.charAt(a)){
+                    case ' ':
+                        if(temp != null){
+                            myStatements.add(temp);
+                            finStatements.add(Boolean.FALSE);
+                            temp=null;
+                        }
+                        break;
+                    case '(':
                         myStatements.add("" + statement.charAt(a));
                         finStatements.add(Boolean.FALSE);
-                    }
-                    break;
-                case '?':
-                    myStatements.add("" + statement.charAt(a));
-                    finStatements.add(Boolean.FALSE);
-                    break;
-                case ':':
-                    myStatements.add("" + statement.charAt(a));
-                    finStatements.add(Boolean.FALSE);
-                    break;
-                case '!':
-                    myStatements.add("" + statement.charAt(a));
-                    finStatements.add(Boolean.FALSE);
-                    break;
-                case '~':
-                    myStatements.add("" + statement.charAt(a));
-                    finStatements.add(Boolean.FALSE);
-                    break;
-                default:
-                    if(temp==null)
-                        temp="";
-                    temp+=statement.charAt(a);
+                        break;
+                    case ')':
+                        if(temp!=null){
+                            myStatements.add(temp);
+                            finStatements.add(Boolean.FALSE);
+                            temp=null;
+                        }
+                        myStatements.add("" + statement.charAt(a));
+                        finStatements.add(Boolean.FALSE);
+                        break;
+                    case '{':
+                        myStatements.add("" + statement.charAt(a));
+                        finStatements.add(Boolean.FALSE);
+                        break;
+                    case '}': 
+                        if(temp!=null){
+                            myStatements.add(temp);
+                            finStatements.add(Boolean.FALSE);
+                            temp=null;
+                        }
+                        myStatements.add("" + statement.charAt(a));
+                        finStatements.add(Boolean.FALSE);
+                        break;
+                    case ',':
+                        if(temp!=null){
+                            myStatements.add(temp);
+                            finStatements.add(Boolean.FALSE);
+                            temp=null;
+                        }
+                        break;
+                    case '>':
+                        if(statement.charAt(a+1)=='='){
+                            myStatements.add(statement.substring(a,a+2));
+                            finStatements.add(Boolean.FALSE);
+                            a++;
+                        }
+                        else{
+                            myStatements.add("" + statement.charAt(a));
+                            finStatements.add(Boolean.FALSE);
+                        }
+                        break;
+                    case '?':
+                        myStatements.add("" + statement.charAt(a));
+                        finStatements.add(Boolean.FALSE);
+                        break;
+                    case ':':
+                        myStatements.add("" + statement.charAt(a));
+                        finStatements.add(Boolean.FALSE);
+                        break;
+                    case '!':
+                        myStatements.add("" + statement.charAt(a));
+                        finStatements.add(Boolean.FALSE);
+                        break;
+                    case '~':
+                        myStatements.add("" + statement.charAt(a));
+                        finStatements.add(Boolean.FALSE);
+                        break;
+                    default:
+                        if(temp==null)
+                            temp="";
+                        temp+=statement.charAt(a);
+                }
+                a++;
             }
-            a++;
-        }
-        if(temp!=null){
-            myStatements.add(temp);
-            finStatements.add(Boolean.FALSE);
-        }
-        //things to watch for: (...), !, ?, :
-        //perform operations using functions and recursion
-        ArrayList<String> tempList= new ArrayList<String>();
-        //while(done){
-            //do all the comparators first
-        if(myStatements.size() > 1){
+            if(temp!=null){
+                myStatements.add(temp);
+                finStatements.add(Boolean.FALSE);
+            }
+            //things to watch for: (...), !, ?, :
+            //perform operations using functions and recursion
             for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("(")){
-                    myStatements.remove(i);
-                    while(!myStatements.get(i).equals(")")){
-                        tempList.add(myStatements.get(i));
+                if(myStatements.get(i).charAt(myStatements.get(i).length()-1)==']'){
+                    int d = 0;
+                    while(myStatements.get(i).charAt(d)!= '[')
+                        d++;
+                    int spot = Integer.parseInt(myStatements.get(i).substring(d+1, myStatements.get(i).length()-1));
+                    for(Wire wire : currModule.wires){
+                        if(wire.name.equals(myStatements.get(i).substring(0,d)+"_"+spot)){
+                            myStatements.remove(i);
+                            myStatements.add(i,wire.name);
+                        }
+                    }
+//                    for(Part part : currModule.parts){
+//                        if(part instanceof Splitter && part.name.contains(myStatements.get(i).substring(0,d))){
+//                            for(Wire wire : currModule.wires){
+//                                for(Port port : wire.ports){
+//                                    if(port.part!=null){
+//                                        if(port.name.contains(part.name+"-"+spot)){
+//                                            myStatements.remove(i);
+//                                            myStatements.add(i,wire.name);
+//                                        }
+//                                    }
+//                                }
+//                            }
+//                        }
+//                    }
+                }
+            }
+            ArrayList<String> tempList= new ArrayList<String>();
+            //while(done){
+                //do all the comparators first
+            if(myStatements.size() > 1){
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("(")){
+                        myStatements.remove(i);
+                        int there = 0;
+                        while(!myStatements.get(i).equals(")") || there != 0){
+                            if(myStatements.get(i).equals("("))
+                                there++;
+                            if(there != 0 && myStatements.get(i).equals(")"))
+                                there--;
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
                         myStatements.remove(i);
                         finStatements.remove(i);
-                    }
-                    myStatements.remove(i);
-                    finStatements.remove(i);
-                    int currSize = tempList.size();
-                    for(int l = 0; l < currSize; l++){
-                        if(tempList.get(l).equals(">=")||tempList.get(l).equals("<=")||tempList.get(l).equals(">")||
-                                tempList.get(l).equals("<")||tempList.get(l).equals("==")||tempList.get(l).equals("!=")){
-                            for(int j = i; j < myStatements.size(); j++){
-                                if(myStatements.get(j).equals("?")){
-                                    for(int k = 0; k < 4; k++){
-                                        tempList.add(myStatements.get(j));
-                                        myStatements.remove(j);
-                                        finStatements.remove(j);
+                        int currSize = tempList.size();
+                        for(int l = 0; l < currSize; l++){
+                            if(tempList.get(l).equals(">=")||tempList.get(l).equals("<=")||tempList.get(l).equals(">")||
+                                    tempList.get(l).equals("<")||tempList.get(l).equals("==")||tempList.get(l).equals("!=")){
+                                for(int j = i; j < myStatements.size(); j++){
+                                    if(myStatements.get(j).equals("?")){
+                                        for(int k = 0; k < 4; k++){
+                                            tempList.add(myStatements.get(j));
+                                            myStatements.remove(j);
+                                            finStatements.remove(j);
+                                        }
                                     }
                                 }
                             }
                         }
+                        String tempAssign = "";
+                        for(String state : tempList){
+                            tempAssign+=state;
+                            tempAssign+=" ";
+                        }
+                        currModule.addWire("MISC"+numWires,1);
+                        numWires++;
+                        myStatements.add(i,assign("MISC"+(numWires-1)+" = "+tempAssign+";"));
+                        finStatements.add(i,Boolean.TRUE);
+                        tempList.clear();
                     }
-                    String tempAssign = "";
-                    for(String state : tempList){
-                        tempAssign+=state;
-                        tempAssign+=" ";
-                    }
-                    currModule.addWire("MISC"+numWires,1);
-                    numWires++;
-                    myStatements.add(i,assign("MISC"+(numWires-1)+" = "+tempAssign+";"));
-                    finStatements.add(i,Boolean.TRUE);
-                    tempList.clear();
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("!")||
-                        (myStatements.get(i).equals("~")&&
-                        !(myStatements.get(i+1).equals("&") ||
-                        myStatements.get(i+1).equals("|")||
-                        myStatements.get(i+1).equals("^")))){
-                    for(int j = 0; j < 2; j++){
-                        tempList.add(myStatements.get(i));
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("{")){
+                        myStatements.remove(i);
+                        while(!myStatements.get(i).equals("}")){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
                         myStatements.remove(i);
                         finStatements.remove(i);
+                        myStatements.add(i, concat(tempList));
                     }
-                    myStatements.add(i,not(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("&&")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("!")||
+                            (myStatements.get(i).equals("~")&&
+                            !(myStatements.get(i+1).equals("&") ||
+                            myStatements.get(i+1).equals("|")||
+                            myStatements.get(i+1).equals("^")))){
+                        for(int j = 0; j < 2; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,not(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,and(tempList,true));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("||")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("~")
+                            && myStatements.get(i+1).equals("&")){
+                        i--;
+                        for(int j = 0; j < 4; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,nand(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,or(tempList,true));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("&")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("~")
+                            && myStatements.get(i+1).equals("|")){
+                        i--;
+                        for(int j = 0; j < 4; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,nor(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,and(tempList,false));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("|")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if((myStatements.get(i).equals("~")
+                            && myStatements.get(i+1).equals("^"))
+                            ||(myStatements.get(i).equals("^") &&
+                            myStatements.get(i+1).equals("~"))){
+                        i--;
+                        for(int j = 0; j < 4; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,xnor(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,or(tempList,false));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("~")
-                        && myStatements.get(i+1).equals("&")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("&&")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,and(tempList,true));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,nand(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("~")
-                        && myStatements.get(i+1).equals("|")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("||")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,or(tempList,true));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,nor(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if((myStatements.get(i).equals("~")
-                        && myStatements.get(i+1).equals("^"))
-                        ||(myStatements.get(i).equals("^") &&
-                        myStatements.get(i+1).equals("~"))){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("&")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,and(tempList,false));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,xnor(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("^")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("|")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,or(tempList,false));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,xor(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("*")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("^")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,xor(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,multiplier(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("/")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("*")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,multiplier(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,divider(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("+")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("/")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,divider(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,adder(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-                else if(myStatements.get(i).equals("-")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("+")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,adder(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,subtractor(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
+                    else if(myStatements.get(i).equals("-")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,subtractor(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
+                    }
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals(">=") ||
-                        myStatements.get(i).equals("<=") ||
-                        myStatements.get(i).equals(">") ||
-                        myStatements.get(i).equals("<") ||
-                        myStatements.get(i).equals("==") ||
-                        myStatements.get(i).equals("!=")){
-                    i--;
-                    for(int j = 0; j < 3; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals(">") && myStatements.get(i+1).equals(">")){
+                        i--;
+                        for(int j = 0; j < 4; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,bitShiftR(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    for(int j = 0; j < myStatements.size(); j++){
-                        if(myStatements.get(j).equals("?")){
-                            for(int k = 0; k < 4; k++){
-                                tempList.add(myStatements.get(j));
-                                myStatements.remove(j);
-                                finStatements.remove(j);
+                }
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("<") && myStatements.get(i+1).equals("<")){
+                        i--;
+                        for(int j = 0; j < 4; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,bitShiftL(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
+                    }
+                }
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals(">=") ||
+                            myStatements.get(i).equals("<=") ||
+                            myStatements.get(i).equals(">") ||
+                            myStatements.get(i).equals("<") ||
+                            myStatements.get(i).equals("==") ||
+                            myStatements.get(i).equals("!=")){
+                        i--;
+                        for(int j = 0; j < 3; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        for(int j = 0; j < myStatements.size(); j++){
+                            if(myStatements.get(j).equals("?")){
+                                for(int k = 0; k < 4; k++){
+                                    tempList.add(myStatements.get(j));
+                                    myStatements.remove(j);
+                                    finStatements.remove(j);
+                                }
                             }
                         }
+                        myStatements.add(i,comparator(tempList));
+                        tempList.clear();
+                        finStatements.add(i,Boolean.TRUE);
                     }
-                    myStatements.add(i,comparator(tempList));
-                    tempList.clear();
-                    finStatements.add(i,Boolean.TRUE);
                 }
-            }
-            for(int i = 0; i < myStatements.size(); i++){
-                if(myStatements.get(i).equals("?")){
-                    i--;
-                    for(int j = 0; j < 5; j++){
-                        tempList.add(myStatements.get(i));
-                        myStatements.remove(i);
-                        finStatements.remove(i);
+                for(int i = 0; i < myStatements.size(); i++){
+                    if(myStatements.get(i).equals("?")){
+                        i--;
+                        for(int j = 0; j < 5; j++){
+                            tempList.add(myStatements.get(i));
+                            myStatements.remove(i);
+                            finStatements.remove(i);
+                        }
+                        myStatements.add(i,turnary(tempList));
+                        finStatements.add(i,Boolean.TRUE);
+                        tempList.clear();
                     }
-                    myStatements.add(i,turnary(tempList));
-                    finStatements.add(i,Boolean.TRUE);
-                    tempList.clear();
                 }
-            }
-            int count = 0;
-            int finalCount = -1;
-            for(Wire wire : currModule.wires){
-                if(wire.name.equals(myStatements.get(0))){
-                    left.copy(wire);
-                    finalCount = count;
+                int count = 0;
+                int finalCount = -1;
+                for(Wire wire : currModule.wires){
+                    if(wire.name.equals(myStatements.get(0))){
+                        left.copy(wire);
+                        finalCount = count;
+                    }
+                    count++;
                 }
-                count++;
+                currModule.wires.remove(finalCount);
+                return left.name;
             }
-            currModule.wires.remove(finalCount);
-            return left.name;
+            else{
+                int count = 0;
+                int finalCount = -1;
+                for(Wire wire : currModule.wires){
+                    if(wire.name.equals(myStatements.get(0))){
+                        left.copy(wire);
+                        finalCount = count;
+                    }
+                    count++;
+                }
+                left.name=currModule.wires.get(finalCount).name;
+                currModule.wires.remove(finalCount);
+                return left.name;
+            }
         }
-        else{
-            int count = 0;
-            int finalCount = -1;
-            for(Wire wire : currModule.wires){
-                if(wire.name.equals(myStatements.get(0))){
-                    left.copy(wire);
-                    finalCount = count;
-                }
-                count++;
-            }
-            left.name=currModule.wires.get(finalCount).name;
-            currModule.wires.remove(finalCount);
-            return left.name;
-        }
+        return left.name;
     }
     
     public String always(ArrayList<String> myAlwaysStatement){
@@ -642,17 +971,68 @@ public class Compiler {
         return "";
     }
     
+    public void split(Wire splitWire, int size){
+        if(size > 1){
+            currModule.parts.add(new Splitter(splitWire.name, size,numSplitters));
+            numSplitters++;
+            splitWire.ports.add(currModule.parts.get(currModule.parts.size()-1).ports.get(0));
+            for(int i = 0; i < size; i++){
+                currModule.addWire("MISC"+numWires,1).ports.add(currModule.parts.get(currModule.parts.size()-1).ports.get(i+1));
+                numWires++;
+            }
+        }
+    }
+    
+    public void combine(Wire combineWire, int size){
+        if(size > 1){
+            currModule.parts.add(new Combiner(combineWire.name, size,numCombiners));
+            numCombiners++;
+            combineWire.ports.add(currModule.parts.get(currModule.parts.size()-1).ports.get(0));
+            for(int i = 0; i < size; i++){
+                currModule.addWire("MISC"+numWires,1).ports.add(currModule.parts.get(currModule.parts.size()-1).ports.get(i+1));
+                numWires++;
+            }
+        }
+    }
+    
+    public String concat(ArrayList<String> myConcatStatement){
+        Wire[] myWires = new Wire[myConcatStatement.size()];
+        int num = 0;
+        int numInPorts = 0;
+        int outSize = 0;
+        for(String statement : myConcatStatement){
+            for(Wire wire : currModule.wires){
+                if(wire.name.equals(statement)){
+                    myWires[num] = wire;
+                    num++;
+                    numInPorts++;
+                    outSize += wire.size;
+                }
+            }
+        }
+        Concatenator newConcat = new Concatenator("CONCAT"+numConcats,numInPorts);
+        currModule.parts.add(newConcat);
+        numConcats++;
+        for(int i = 0; i < numInPorts; i++){
+            myWires[i].ports.add(currModule.parts.get(currModule.parts.size()-1).ports.get(i));
+        }
+        currModule.addWire("MISC"+numWires, outSize).ports.add(newConcat.ports.get(numInPorts));
+        numWires++;
+        return ("MISC"+(numWires-1));
+    }
+    
     public String not(ArrayList<String> myNotStatement){
-        Wire notWire = null;
+        Wire notWire = null; 
         for(Wire wire : currModule.wires){
             if(wire.name.equals(myNotStatement.get(1)))
                 notWire = wire;
         }
+        int bitSize = notWire.size;
         Inverter newInv = new Inverter("INV"+numInverters);
         currModule.parts.add(newInv);
         numInverters++;
         notWire.ports.add(newInv.ports.get(0));
-        currModule.addWire("MISC"+numWires,1).ports.add(newInv.ports.get(1));
+        currModule.addWire("MISC"+numWires,bitSize).ports.add(newInv.ports.get(1));
         numWires++;
         return ("MISC"+(numWires-1));
     }
@@ -742,7 +1122,7 @@ public class Compiler {
         for(Wire wire : currModule.wires){
             if(wire.name.equals(myNandStatement.get(0)))
                 Left = wire;
-            if(wire.name.equals(myNandStatement.get(2)))
+            if(wire.name.equals(myNandStatement.get(3)))
                 Right = wire;
         }
         NAND newNAnd = new NAND("NAND"+numNANDs);
@@ -761,7 +1141,7 @@ public class Compiler {
         for(Wire wire : currModule.wires){
             if(wire.name.equals(myNorStatement.get(0)))
                 Left = wire;
-            if(wire.name.equals(myNorStatement.get(2)))
+            if(wire.name.equals(myNorStatement.get(3)))
                 Right = wire;
         }
         NOR newNOr = new NOR("NOR"+numNORs);
@@ -780,7 +1160,7 @@ public class Compiler {
         for(Wire wire : currModule.wires){
             if(wire.name.equals(myXNorStatement.get(0)))
                 Left = wire;
-            if(wire.name.equals(myXNorStatement.get(2)))
+            if(wire.name.equals(myXNorStatement.get(3)))
                 Right = wire;
         }
         XNOR newXNor = new XNOR("XNOR"+numXNORs);
@@ -891,13 +1271,13 @@ public class Compiler {
     
     public String comparator(ArrayList<String> myCompStatement){
         Wire Left = null;
-         Wire Right = null;
-         for(Wire wire : currModule.wires){
-             if(wire.name.equals(myCompStatement.get(0)))
-                 Left = wire;
-             if(wire.name.equals(myCompStatement.get(2)))
-                 Right = wire;
-         }
+        Wire Right = null;
+        for(Wire wire : currModule.wires){
+            if(wire.name.equals(myCompStatement.get(0)))
+                Left = wire;
+            if(wire.name.equals(myCompStatement.get(2)))
+                Right = wire;
+        }
         Comparator newComp = new Comparator("COMP>="+numComparators);
         int temp1 = Integer.parseInt(myCompStatement.get(4));
         int temp2 = Integer.parseInt(myCompStatement.get(6));
@@ -988,18 +1368,65 @@ public class Compiler {
         Turn2.ports.add(newMux.ports.get(0));
         currModule.addWire("MISC"+numWires,bitSize).ports.add(newMux.ports.get(3));
         numWires++;
+        //split(currModule.wires.get(currModule.wires.size()-1),bitSize);
         return ("MISC"+(numWires-1));
+    }
+    
+    public String bitShiftR(ArrayList<String> myBitSRStatement){
+        Wire Left = null;
+        for(Wire wire : currModule.wires){
+            if(wire.name.equals(myBitSRStatement.get(0)))
+                Left = wire;
+        }
+        int amount = Integer.parseInt(myBitSRStatement.get(3));
+        BitShiftR newBSR = new BitShiftR("BSR"+numBSRs,amount);
+        numBSRs++;
+        currModule.parts.add(newBSR);
+        Left.ports.add(newBSR.ports.get(0));
+        currModule.addWire("MISC"+numWires, Left.size).ports.add(newBSR.ports.get(1));
+        numWires++;
+        return ("MISC"+(numWires-1));
+    }
+    
+    public String bitShiftL(ArrayList<String> myBitSLStatement){
+        return "";
     }
     
     public void insertMod(Module module){
         for(int l = 0; l < module.parts.size();l++){
             if(module.parts.get(l) instanceof Module_Part){
                 Wire[] realWires = new Wire[module.parts.get(l).ports.size()];
-                int i = 0;
-                for(Wire wire : module.wires){
-                    if(wire.name.equals(module.parts.get(l).ports.get(i).name)){
-                            realWires[i]=wire;
-                            i++;
+                for(int i = 0; i < module.parts.get(l).ports.size(); i++){
+                    if(!module.parts.get(l).ports.get(i).name.equals("")){
+                        if(module.parts.get(l).ports.get(i).name.charAt(module.parts.get(l).ports.get(i).name.length()-1)==']'){
+                            int d = 0;
+                            while(module.parts.get(l).ports.get(i).name.charAt(d)!= '[')
+                                d++;
+                            int spot = Integer.parseInt(module.parts.get(l).ports.get(i).name.substring(d+1, module.parts.get(l).ports.get(i).name.length()-1));
+                            for(Part part : module.parts){
+                                if(part instanceof Splitter && part.name.contains(module.parts.get(l).ports.get(i).name.substring(0,d))){
+                                    for(Wire wire : module.wires){
+                                        for(Port port : wire.ports){
+                                            if(port.part!=null){
+                                                if(port.name.equals(part.name+"-"+spot)){
+                                                    realWires[i]=wire;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        else{
+                            for(Wire wire: module.wires){
+                                if(wire.name.equals(module.parts.get(l).ports.get(i).name)){
+                                    realWires[i]=wire;
+                                }
+                            }
+                        }
+                    }
+                    else{
+                        realWires[i]=GND;
                     }
                 }
                 String[] dummyWires;
@@ -1035,30 +1462,25 @@ public class Compiler {
     }
     
     public void bit2bits(Module currModule){
-//        ArrayList<Part> newParts = new ArrayList<Part>();
         ArrayList<Wire> newWires = new ArrayList<Wire>();
         for(Wire wire : currModule.wires){
-            for(int i = 0; i < wire.size; i++){
-                newWires.add(new Wire(wire.name+"-"+i,1));
-                for(Port port : wire.ports){
-                    if(port.part != null){
-//                        Part tempPart = new Part("");
-//                        tempPart.copy(port.part);
-//                        newParts.add(tempPart);
-//                        newParts.get(newParts.size()-1).name = newParts.get(newParts.size()-1).name+"-"+i;
-                        newWires.get(newWires.size()-1).ports.add(new Port(port.name+"-"+i,port.part));
-                    }   
-                    else
-                        newWires.get(newWires.size()-1).ports.add(new Port(port.name+"-"+i,port.IO));
+            if(!(wire.name.equals("GND")||wire.name.equals("VCC"))){
+                for(int i = 0; i < wire.size; i++){
+                    newWires.add(new Wire(wire.name+"-"+i,1));
+                    for(Port port : wire.ports){
+                        if(port.part != null){
+                            newWires.get(newWires.size()-1).ports.add(new Port(port.name+"-"+i,port.part));
+                        }   
+                        else
+                            newWires.get(newWires.size()-1).ports.add(new Port(port.name+"-"+i,port.IO));
+                    }
                 }
             }
+            else{
+                newWires.add(wire);
+            }
         }
-//        for(Part part: currModule.parts){
-//            
-//        }
-        System.out.println("stop");
         currModule.wires = newWires;
-//        currModule.parts = newParts;
     }
     /**
      * Convert parts not in database into gate layouts
@@ -1115,17 +1537,54 @@ public class Compiler {
                     currWires.clear();
                     i--;
                 }
+                
+                else if(currModule.parts.get(i) instanceof Inverter){
+                    if(InvBD(currModule.parts.get(i),currWires)==0){
+                        removePorts(currWires,i);
+                        i--;
+                    }
+                    currWires.clear();
+                }
+                else if(currModule.parts.get(i) instanceof Concatenator){
+                    concatBD(currModule.parts.get(i),currWires);
+                    removePorts(currWires,i);
+                    currWires.clear();
+                    i--;
+                }
+                else if(currModule.parts.get(i) instanceof Splitter){
+                    SplitBD(currModule.parts.get(i),currWires);
+                    removePorts(currWires,i);
+                    currWires.clear();
+                    i--;
+                }
+                else if(currModule.parts.get(i) instanceof Combiner){
+                    CombineBD(currModule.parts.get(i),currWires);
+                    removePorts(currWires,i);
+                    currWires.clear();
+                    i--;
+                }
+                else if(currModule.parts.get(i) instanceof BitShiftR){
+                    bitShiftRBD((BitShiftR)currModule.parts.get(i),currWires);
+                    removePorts(currWires,i);
+                    currWires.clear();
+                    i--;
+                }
+                else{
+                    currWires.clear();
+                }
             }
         }
     }
     
     public void removePorts(ArrayList<Wire> currWires, int spot){
         for(int j = 0; j < currWires.size(); j++){
-            for(int k = 0; k < currWires.get(j).ports.size(); k++){
-                if(currWires.get(j).ports.get(k).part != null){
-                    if(currWires.get(j).ports.get(k).part.name.equals(currModule.parts.get(spot).name)){
-                        currWires.get(j).ports.remove(k);
-                        k--;
+            if(!(currWires.get(j).name.equals("GND")||currWires.get(j).name.equals("VCC"))){
+                for(int k = 0; k < currWires.get(j).ports.size(); k++){
+                    if(currWires.get(j).ports.get(k).part != null){
+                        if(currWires.get(j).ports.get(k).part.name.equals(currModule.parts.get(spot).name)){
+                            currWires.get(j).ports.remove(k);
+                            k--;
+                        }
                     }
                 }
             }
@@ -1149,10 +1608,10 @@ public class Compiler {
                             aBit++;
                         else if(port.name.substring(0,1).equals("b"))
                             bBit++;
-                    }
-                }
-            }
-        }
+                                            }
+                                        }
+                                    }
+                                }
         if(aBit > bBit)
             bitSize=aBit;
         else
@@ -1170,21 +1629,21 @@ public class Compiler {
                     myWires[j] = null;
             }
             for(Wire wire : partWires){
-            for(Port port : wire.ports){
-                if(port.part != null){
-                    if(port.part.name.equals(addPart.name)){
-                        if(port.name.equals("a-"+i))
-                            myWires[0] = wire;
-                        else if(port.name.equals("b-"+i))
-                            myWires[1] = wire;
+                for(Port port : wire.ports){
+                    if(port.part != null){
+                        if(port.part.name.equals(addPart.name)){
+                            if(port.name.equals("a-"+i))
+                                myWires[0] = wire;
+                            else if(port.name.equals("b-"+i))
+                                myWires[1] = wire;
                         else if(port.name.equals("cin-"+i) && i==0)
-                            myWires[2] = wire;
-                        else if(port.name.equals("cin-"+i) && i!=0)
-                            myWires[2] = myWires[4];
-                        else if(port.name.equals("y-"+i))
-                            myWires[3] = wire;
-                        else if(port.name.equals("cout-"+i))
-                            myWires[4] = wire;
+                                myWires[2] = wire;
+                            else if(port.name.equals("cin-"+i) && i!=0)
+                                myWires[2] = myWires[4];
+                            else if(port.name.equals("y-"+i))
+                                myWires[3] = wire;
+                            else if(port.name.equals("cout-"+i))
+                                myWires[4] = wire;
                         }
                     }
                 }
@@ -1214,8 +1673,8 @@ public class Compiler {
             assign(newWires[1]+" = "+newWires[0]+" & "+myWires[2].name+";");
             assign(newWires[2]+" = "+myWires[0].name+" & "+myWires[1].name+";");
             assign(myWires[4].name+" = "+newWires[1]+" | "+newWires[2]+";");
-        }
-    }
+                            }
+                        }
     
     public void subtractorBD(Part subPart, ArrayList<Wire> partWires){
         //find out how many bits, each input and output is associated with
@@ -1771,6 +2230,211 @@ public class Compiler {
             assign(newWires[i*2]+" = "+myWires[i].name+" & !"+myWires[bitSize*3].name+";");
             assign(newWires[(i*2)+1]+" = "+myWires[i+bitSize].name+" & "+myWires[bitSize*3].name+";");
             assign(myWires[(bitSize*2)+i].name+" = "+newWires[i*2]+" | "+newWires[(i*2)+1]+";");
+        }
+    }
+    
+    public int InvBD(Part invPart, ArrayList<Wire> partWires){
+        int bitSize=0;
+        for(Wire wire : partWires){
+            for(Port port : wire.ports){
+                if(port.part != null){
+                    if(port.part.name.equals(invPart.name)){
+                        if(port.name.substring(0,1).equals("a"))
+                            bitSize++;
+                    }
+                }
+            }
+        }
+        int numIn=0;
+        int numOut=0;
+        if(bitSize != 1){
+            Wire[] myWires = new Wire[bitSize*2];
+            for(Wire wire : partWires){
+                for(Port port : wire.ports){
+                    if(port.part != null){
+                        if(port.part.name.equals(invPart.name)){
+                            if(port.name.substring(0,2).equals("a-")){
+                                myWires[numIn] = wire;
+                                numIn++;
+                            }
+                            else if(port.name.substring(0,2).equals("b-")){
+                                myWires[bitSize+numOut] = wire;
+                                numOut++;
+                            }
+                        }
+                    } 
+                }
+            }
+            for(int i = 0; i < bitSize; i++){
+                assign(myWires[bitSize + i].name+" = ~"+myWires[i].name+";");
+            }
+            return 0;
+        }
+        else
+            return 1;
+    }
+    
+    public void concatBD(Part concatPart, ArrayList<Wire> partWires){
+        int bitSize=0;
+        for(Wire wire : partWires){
+            for(Port port : wire.ports){
+                if(port.part != null){
+                    if(port.part.name.equals(concatPart.name)){
+                        if(port.name.contains("out"))
+                            bitSize++;
+                    }
+                }
+            }
+        }
+        int numIn=0;
+        int numOut=0;
+        Wire[] myWires = new Wire[bitSize*2];
+        for(Wire wire : partWires){
+            for(Port port : wire.ports){
+                if(port.part != null){
+                    if(port.part.name.equals(concatPart.name)){
+                        if(port.name.contains("out")){
+                            int a=0;
+                            while(port.name.charAt(a)!='-')
+                                a++;
+                            numOut=Integer.parseInt(port.name.substring(a+1));
+                            myWires[numOut] = wire;
+                        }
+                        else if(port.name.contains("in-")){
+                            int a=0;
+                            int b;
+                            while(port.name.charAt(a)!='-')
+                                a++;
+                            b=a+1;
+                            while(port.name.charAt(b)!='-')
+                                b++;
+                            numIn=Integer.parseInt(port.name.substring(a+1, b)); 
+                            myWires[bitSize+numIn]=wire;
+                        }
+                    }
+                } 
+            }
+        }
+        for(int i = 0; i < myWires.length; i++){
+            if(myWires[i]==null)
+                myWires[i]=GND;
+        }
+        for(int i = 0; i < bitSize; i++){
+            assign(myWires[i].name+" = "+myWires[bitSize+i].name+";");
+        }
+    }
+    
+    public void SplitBD(Part splitPart, ArrayList<Wire> partWires){
+        int bitSize=splitPart.ports.size()-1;
+//        for(Wire wire : partWires){
+//            for(Port port : wire.ports){
+//                if(port.part != null){
+//                    if(port.part.name.equals(splitPart.name)){
+//                        if(port.name.contains(splitPart.name+"-in"))
+//                            bitSize++;
+//                    }
+//                }
+//            }
+//        }
+        int numIn=0;
+        int numOut=0;
+        Wire[] myWires = new Wire[bitSize*2];
+        for(Wire wire : partWires){
+            for(Port port : wire.ports){
+                if(port.part != null){
+                    if(port.part.name.equals(splitPart.name)){
+                        if(port.name.equals(splitPart.name+"-in-"+numIn)){
+                            myWires[numIn] = wire;
+                            numIn++;
+                        }
+                        else if(port.name.contains(splitPart.name+"-") && !(port.name.contains(splitPart.name+"-in-"))){
+                            int a=0;
+                            int b;
+                            while(port.name.charAt(a)!='-')
+                                a++;
+                            b=a+1;
+                            while(port.name.charAt(b)!='-')
+                                b++;
+                            numOut=Integer.parseInt(port.name.substring(a+1, b)); 
+                            myWires[bitSize+numOut]=wire;
+                        }
+                    }
+                } 
+            }
+        }
+        for(int i = 0; i < bitSize; i++){
+            assign(myWires[i].name+" = "+myWires[bitSize+i].name+";");
+        }
+    }
+ 
+    public void CombineBD(Part combinePart, ArrayList<Wire> partWires){
+        int bitSize=combinePart.ports.size()-1;
+        int numIn=0;
+        int numOut=0;
+        Wire[] myWires = new Wire[bitSize*2];
+        for(Wire wire : partWires){
+            for(Port port : wire.ports){
+                if(port.part != null){
+                    if(port.part.name.equals(combinePart.name)){
+                        if(port.name.equals(combinePart.name+"-out-"+numOut)){
+                            myWires[numOut] = wire;
+                            numOut++;
+                        }
+                        else if(port.name.contains(combinePart.name+"-") && !(port.name.contains(combinePart.name+"-out-"))){
+                            int a=0;
+                            int b;
+                            while(port.name.charAt(a)!='-')
+                                a++;
+                            b=a+1;
+                            while(port.name.charAt(b)!='-')
+                                b++;
+                            numIn=Integer.parseInt(port.name.substring(a+1, b)); 
+                            myWires[bitSize+numIn]=wire;
+                        }
+                    }
+                } 
+            }
+        }
+        for(int i = 0; i < bitSize; i++){
+            assign(myWires[i].name+" = "+myWires[bitSize+i].name+";");
+        }
+    }
+    
+    public void bitShiftRBD(BitShiftR bitSPart, ArrayList<Wire> partWires){
+        int bitSize=0;
+        for(Wire wire : partWires){
+            for(Port port : wire.ports){
+                if(port.part != null){
+                    if(port.part.name.equals(bitSPart.name)){
+                        if(port.name.contains("out"))
+                            bitSize++;
+                    }
+                }
+            }
+        }
+        int numIn=0;
+        int numOut=0;
+        Wire[] myWires = new Wire[bitSize*2];
+        for(Wire wire : partWires){
+            for(Port port : wire.ports){
+                if(port.part != null){
+                    if(port.part.name.equals(bitSPart.name)){
+                        if(port.name.equals("in-"+numIn)){
+                            myWires[numIn] = wire;
+                            numIn++;
+                        }
+                        else if(port.name.equals("out-"+numOut)){
+                            myWires[bitSize+numOut] = wire;
+                            numOut++;
+                        }
+                    }
+                } 
+            }
+        }
+        for(int i = 0; i < bitSPart.amount; i++)
+            myWires[((bitSize*2)-1)-i]=GND;
+        for(int i = 0; i < bitSPart.amount; i++){
+            assign(myWires[(bitSize-1)-i].name+" = "+myWires[((bitSize*2)-1)-bitSPart.amount-i].name+";");
         }
     }
     

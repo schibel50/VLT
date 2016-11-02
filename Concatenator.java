@@ -9,12 +9,12 @@ package vlt;
  *
  * @author Parker
  */
-public class BitShiftL extends Part{
-    public int amount;
-    public BitShiftL(String name, int amount){
+public class Concatenator extends Part{
+    
+    public Concatenator(String name, int numIns){
         super(name);
-        this.amount = amount;
-        ports.add(new Port("in",this));
+        for(int i = 0; i < numIns; i++)
+            ports.add(new Port("in-"+i, this));
         ports.add(new Port("out",this));
     }
 }

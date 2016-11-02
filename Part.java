@@ -23,6 +23,12 @@ public class Part {
         activeLow = false;
     }
     
+    public Part(Part part){
+        this.name=part.name;
+        this.ports=part.ports;
+        this.activeLow=part.activeLow;
+    }
+    
     public void copy(Part part){
         this.name = part.name;
         for(int i = 0; i < part.ports.size(); i++)

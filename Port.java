@@ -26,4 +26,10 @@ public class Port {
         this.IO = IO;
         this.part=null;
     }
+    
+    public Port(Port port){
+        this.name = port.name;
+        this.IO = port.IO;
+        this.part=port.part;
+    }
 }

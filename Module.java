@@ -30,7 +30,29 @@ public class Module {
         parts = new ArrayList<>();
         wires = new ArrayList<>();
     }
+    
+    public void clear(){
+        this.name=null;
+        this.ioNames=null;
+        this.start=-1;
+        this.end=-1;
+        this.parts.clear();
+        this.wires.clear();
+    }
 
+    /**
+     * Retrieve a Wire of a given name
+     * @param name name of the Wire to get
+     * @return the Wire
+     */
+    public Wire getWire(String name){
+        for(Wire wire : wires) {
+            if (wire.name.equals(name))
+                return wire;
+        }
+        return null;
+    }
+    
     /**
      * Set a Wire's connection logic
      * @param name name of the Wire to set
@@ -70,9 +92,19 @@ public class Module {
      */
     public void addInputs(String[] names, int size){
         int i;
-        for(i=0;i<names.length;i++){
-            wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";",""),size));
-            wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";",""),(byte)1));
+        if(size==1){
+            for(i=0;i<names.length;i++){
+                wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";",""),size));
+                wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";",""),(byte)1));
+            }
+        }
+        else{
+            for(i=0;i<names.length;i++){
+                for(int j=0;j<size;j++){
+                    wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,1));
+                    wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,(byte)1));
+                }
+            }
         }
     }
     /**
@@ -81,9 +113,19 @@ public class Module {
      */
     public void addOutputs(String[] names, int size){
         int i;
-        for(i=0;i<names.length;i++){
-            wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";",""),size));
-            wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";",""),(byte)-1));
+        if(size==1){
+            for(i=0;i<names.length;i++){
+                wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";",""),size));
+                wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";",""),(byte)-1));
+            }
+        }
+        else{
+            for(i=0;i<names.length;i++){
+                for(int j=0;j<size;j++){
+                    wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,1));
+                    wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,(byte)-1));
+                }
+            }
         }
     }
     /**
@@ -92,7 +134,16 @@ public class Module {
      */
     public void addWires(String[] names, int size){
         int i;
-        for(i=0;i<names.length;i++)
-            wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";",""),size));
+        if(size==1){
+            for(i=0;i<names.length;i++)
+                wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";",""),size));
+        }
+        else{
+            for(i=0;i<names.length;i++){
+                for(int j=0;j<size;j++){
+                    wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,1));
+                }
+            }
+        }
     }
 }
