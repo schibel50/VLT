@@ -15,7 +15,7 @@ public class Compiler2 {
     public ArrayList<String> code;//all the code being evaluated
     public ArrayList<Module> modules;//all of the modules being evaluated
     //names of pre-defined modules
-    public String[] preDefinedMods = {"and","or","xor","nand","nor","xnor","buf","not","bufif1","bufif0","notif1","notif0","dff"};
+    public String[] preDefinedMods = {"and","or","xor","nand","nor","xnor","buf","not","bufif1","bufif0","notif1","notif0","DFF"};
     public Module currModule;//the current module being evaluated
     public EWriter edif;//where to write the EDIF
     //all of the possible operators
@@ -128,7 +128,7 @@ public class Compiler2 {
                     end = -1;
                     tempIO = null;
                 }
-                else if(tempName.equals("dff")){
+                else if(tempName.equals("DFF")){
                     tempName="";
                     start=-1;
                     end=-1;
@@ -198,13 +198,16 @@ public class Compiler2 {
                                 ioHelper(code.get(i),3);
                             else{
                                 String[] temp = code.get(i).substring(5).split("\\,");
-                                boolean gndVcc = false;
+                                int gnd = 0;
+                                int vcc = 0;
                                 for(int k = 0; k < temp.length; k++){
                                     temp[k] = temp[k].trim();
-                                    if(temp[k].equals("gnd")||temp[k].equals("vcc"))
-                                        gndVcc=true;
+                                    if(temp[k].equals("gnd")||temp[k].equals("ground"))
+                                        gnd++;
+                                    else if(temp[k].equals("vcc"))
+                                        vcc++;
                                 }
-                                if(!gndVcc){
+                                if(gnd==0&&vcc==0){
                                     if(temp[temp.length-1].charAt(temp[temp.length-1].length()-1)==';');
                                         temp[temp.length-1]=temp[temp.length-1].substring(0,temp[temp.length-1].length()-1);
                                     currModule.addWires(temp,1);
@@ -336,7 +339,7 @@ public class Compiler2 {
         part2gate();
         redundantIOPorts();
         modules.get(0).wires.remove(2);
-        addBuffers();
+//        addBuffers();
         edif = new EWriter(modules.get(0));
         edif.write();
     }
@@ -344,15 +347,24 @@ public class Compiler2 {
     public void preMod(String[] myPorts, int myMod){
         String type="";
         Wire[] myWires = new Wire[myPorts.length];
+        for(int i=0;i<myPorts.length;i++){
+            if(!(myPorts[i].equals("")||myPorts[i].equals(" "))){
+                if(myPorts[i].charAt(myPorts[i].length()-1)==']'){
+                    myPorts[i]=myPorts[i].replace('[', '_');
+                    myPorts[i] = myPorts[i].substring(0,myPorts[i].length()-1);
+                }
+            }
+        }
         for(int i = 0; i < myPorts.length; i++){
             for(Wire wire : currModule.wires){
-                for(Port port : wire.ports){
-                    if(port.name.equals(myPorts[i]))
-                        myWires[i] = wire;
-                    else if(wire.name.equals("gnd")&&myPorts[i].equals("gnd"))
-                        myWires[i]=GND;
-                    else if(wire.name.equals("vcc")&&myPorts[i].equals("vcc"))
-                        myWires[i]=VCC;
+                if(wire.name.equals(myPorts[i])){
+                    myWires[i]=wire;
+                }
+                else if(myPorts[i].equals("ground")||myPorts[i].equals("gnd")){
+                    myWires[i]=GND;
+                }
+                else if(myPorts[i].equals("vcc")){
+                    myWires[i]=VCC;
                 }
             }
         }
@@ -400,7 +412,7 @@ public class Compiler2 {
             assign(tempAssign);
         }
         else if(myMod==6){
-            Buffer newBuff = new Buffer("Buff"+numBuffs);
+            Buffer newBuff = new Buffer("BUFF_"+numBuffs);
             numBuffs++;
             myWires[myWires.length-1].ports.add(newBuff.ports.get(0));
             for(int i = 0; i < myWires.length-1;i++)
@@ -464,7 +476,7 @@ public class Compiler2 {
                 if(currModule.wires.get(i).ports.get(j).part==null&&
                         currModule.wires.get(i).ports.get(j).IO==(byte)1&&
                         currModule.wires.get(i).ports.get(j).name.equals(currModule.wires.get(i).name)){
-                    currBuff = new Buffer("BUFF"+numBuffs);numBuffs++;
+                    currBuff = new Buffer("BUFF_"+numBuffs);numBuffs++;
                     currWire = newWire();
                     currModule.parts.add(currBuff);
                     currWire.ports.add(currBuff.ports.get(1));
@@ -807,7 +819,7 @@ public class Compiler2 {
         if(temp!=null){
             myStatements.add(temp);
         }
-        if(!(myStatements.get(0).equals("gnd")||myStatements.get(0).equals("vcc"))){
+        if(!(myStatements.get(2).equals("supply1")||myStatements.get(2).equals("supply0"))){
             ArrayList<Wire[]> wireSpots = new ArrayList<Wire[]>();
             for(int i=0;i<myStatements.size();i++){
                 if(myStatements.get(i).charAt(myStatements.get(i).length()-1)==']'){
