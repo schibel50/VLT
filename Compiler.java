@@ -340,6 +340,31 @@ public class Compiler {
         edif.write();
     }
     
+    public void addBuffers(){
+        Buffer currBuff;
+        Wire currWire;
+        for(int i=0;i<currModule.wires.size();i++){
+            for(int j=0;j<currModule.wires.get(i).ports.size();j++){
+                if(currModule.wires.get(i).ports.get(j).part==null&&
+                        currModule.wires.get(i).ports.get(j).IO==(byte)1&&
+                        currModule.wires.get(i).ports.get(j).name.equals(currModule.wires.get(i).name)){
+                    currBuff = new Buffer("BUFF"+numBuffs);numBuffs++;
+                    currWire = newWire();
+                    currModule.parts.add(currBuff);
+                    currWire.ports.add(currBuff.ports.get(1));
+                    for(int k=0;k<currModule.wires.get(i).ports.size();k++){
+                        if(currModule.wires.get(i).ports.get(k).part!=null){
+                           currWire.ports.add(currModule.wires.get(i).ports.get(k));
+                           currModule.wires.get(i).ports.remove(k);
+                           k--;
+                        }
+                    }
+                    currModule.wires.get(i).ports.add(currBuff.ports.get(0));
+                }
+            }
+        }
+    }
+    
     /*
     After all of the modules have been evaluated, this method inserts
     modules into the main module wherever they were evaualated in 
@@ -1099,42 +1124,7 @@ public class Compiler {
                     temp = scan(index+1,block,null);
                 }
                 
-                String ifOne="gnd";
-                for(int w=1;w<cases.size();w+=2){
-                    if((cases.get(w)==null)) //fill empty case with default or gnd
-                        if(def!=null)
-                            cases.set(w,def);
-                        else
-                            cases.set(w,null);
-                    if((cases.get(w+1)==null)) //fill empty case with default or gnd
-                        if(def!=null)
-                            cases.set(w+1,def);
-                        else
-                            cases.set(w+1,null);
-                    if(cases.get(w)!=null) //make sure that there is a case for the current vale
-                        for(int j=1;j<cases.get(w).size();j+=2){ //loop through all statements in an even case
-                            int k;
-                            if((cases.get(w+1)!=null)&&(!cases.get(w+1).isEmpty())) //ensure that there is a case for current value +1
-                                for(k=1;k<cases.get(w+1).size();k+=2){ //loop through all statementse in the next odd case
-                                    if(cases.get(w).get(j+1).equals(cases.get(w+1).get(k+1))){
-                                        ifOne = cases.get(w+1).get(k);
-                                        cases.get(w+1).remove(k);
-                                        cases.get(w+1).remove(k);
-                                        break;
-                                    }
-                                }
-                            wire = newWire();
-                            list3.add(assign(wire.name+" = "+"cond"+" ? "+ifOne+" : "+cases.get(w).get(j)));
-                            list3.add(cases.get(w).get(j+1));
-                            ifOne="gnd";
-                        }
-                    if((cases.get(w+1)!=null)&&(!cases.get(w+1).isEmpty())) //ensure that there is a case for current value +1
-                        for(int k=1;k<cases.get(w+1).size();k+=2){ //loop through all the rest of the statements in the odd case
-                            wire = newWire();
-                            list3.add(assign(wire.name+" = "+"cond"+" ? "+cases.get(w+1).get(k))+" : gnd");
-                            list3.add(cases.get(w+1).get(k+1));
-                        }
-                }
+                caseHelper(cases,def);
                 
                 block.remove(index);
                 return list3;
@@ -1181,6 +1171,55 @@ public class Compiler {
                 total+=Math.pow(2,digits.length-j-1);
         }
         return total;
+    }
+    
+    public ArrayList<String> caseHelper(ArrayList<ArrayList<String>> cases,ArrayList<String> def){
+        String ifOne="gnd";
+        ArrayList<String> list1=null;
+        ArrayList<ArrayList<String>> out = new ArrayList<>();
+        while(out.size()<cases.size()/2) //fill the list with null slots
+            out.add(null);
+        for(int w=1;w<cases.size();w+=2){
+            if((cases.get(w)!=null)||(cases.get(w+1)!=null)){
+                list1 = new ArrayList<>();
+                if(cases.get(w)!=null) //make sure that there is a case for the current vale
+                    for(int j=1;j<cases.get(w).size();j+=2){ //loop through all statements in an even case
+                        int k;
+                        if(cases.get(w+1)!=null){
+                            if(!cases.get(w+1).isEmpty()) //ensure that there is a case for current value +1
+                                for(k=1;k<cases.get(w+1).size();k+=2){ //loop through all statementse in the next odd case
+                                    if(cases.get(w).get(j+1).equals(cases.get(w+1).get(k+1))){
+                                        ifOne = cases.get(w+1).get(k);
+                                        cases.get(w+1).remove(k);
+                                        cases.get(w+1).remove(k);
+                                        break;
+                                    }
+                                }
+                        }else
+                            cases.set(w+1,def);
+                        Wire wire = newWire();
+                        list1.add(assign(wire.name+" = "+"cond"+" ? "+ifOne+" : "+cases.get(w).get(j)));
+                        list1.add(cases.get(w).get(j+1));
+                        ifOne="gnd";
+                    }
+                else
+                    cases.set(w,def);
+                if(cases.get(w+1)!=null){
+                    if(!cases.get(w+1).isEmpty()) //ensure that there is a case for current value +1
+                        for(int k=1;k<cases.get(w+1).size();k+=2){ //loop through all the rest of the statements in the odd case
+                            Wire wire = newWire();
+                            list1.add(assign(wire.name+" = "+"cond"+" ? "+cases.get(w+1).get(k))+" : gnd");
+                            list1.add(cases.get(w+1).get(k+1));
+                        }
+                }else
+                    cases.set(w+1,def);
+            }
+            
+            out.add(list1);
+        }
+        if(out.size()>2)
+            return caseHelper(out,def);
+        return list1;
     }
     
      /*
