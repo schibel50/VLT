@@ -8,6 +8,7 @@ package vlt;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.*;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -41,7 +42,6 @@ public class Loader {
             }
             
             buffer.close();
-            
         }catch(Exception e){
             if(e instanceof FileNotFoundException);
             else if(e instanceof IOException);

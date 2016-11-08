@@ -59,8 +59,8 @@ public class EWriter {
         // add instances
         while(i<module.parts.size()){
             Part temp = module.parts.get(i);
-            instances.add("\t\t\t\t\t(instance " + temp.name + " (viewRef VIEWNAMEDEFAULT");
-            instances.add("\t\t\t\t\t\t(cellRef  (libraryRef " + "LIBRARY NAME" + "))");
+            instances.add("\t\t\t\t\t(instance " + temp.name + " (viewRef viewnamedefault");
+            instances.add("\t\t\t\t\t\t(cellRef  (libraryRef beigebag))");
             instances.add("\t\t\t\t\t\t))");
             i++;
         }

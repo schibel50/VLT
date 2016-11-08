@@ -15,9 +15,24 @@ public class Part {
     
     String name;
     ArrayList<Port> ports;
+    boolean activeLow;
     
     public Part(String name){
         this.name=name;
         ports = new ArrayList<>();
+        activeLow = false;
+    }
+    
+    public Part(Part part){
+        this.name=part.name;
+        this.ports=part.ports;
+        this.activeLow=part.activeLow;
+    }
+    
+    public void copy(Part part){
+        this.name = part.name;
+        for(int i = 0; i < part.ports.size(); i++)
+            this.ports.add(part.ports.get(i));
+        this.activeLow = part.activeLow;
     }
 }

@@ -7,12 +7,13 @@ package vlt;
 
 /**
  *
- * @author Ryan
+ * @author Parker
  */
-public class Input extends Part{
-    int size;
-    public Input(String name, int size){
+public class XNOR extends Part{
+    public XNOR(String name){
         super(name);
-        this.size = size;
+        ports.add(new Port("a",this));
+        ports.add(new Port("b",this));
+        ports.add(new Port("x",this));
     }
 }

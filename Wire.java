@@ -22,11 +22,23 @@ public class Wire {
         ports = new ArrayList<>();
     }
     
+    public Wire(Wire wire){
+        this.name = wire.name;
+        this.size = wire.size;
+        this.ports = new ArrayList<>();
+        for(Port port : wire.ports){
+            Port temp = new Port(port);
+            this.ports.add(temp);
+        }
+    }
+    
     public void addPort(Port port){
         ports.add(port);
     }
     
     public void copy(Wire wire){
+        this.name=wire.name;
+        this.size=wire.size;
         for(Port port : wire.ports){
             this.ports.add(port);
         }

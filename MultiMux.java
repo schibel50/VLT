@@ -5,14 +5,15 @@
  */
 package vlt;
 
+import java.util.ArrayList;
+
 /**
  *
  * @author Ryan
  */
-public class Input extends Part{
-    int size;
-    public Input(String name, int size){
+public class MultiMux extends Part{
+    ArrayList<Mux> muxs;
+    public MultiMux(String name){
         super(name);
-        this.size = size;
     }
 }
