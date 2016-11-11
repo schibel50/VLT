@@ -356,7 +356,7 @@ public class Compiler2 {
         if(!VCC.ports.get(0).name.equals("VCC")){
             VCC.ports.add(0,new Port("VCC",(byte)1));
         }
-        part2gate();
+//        part2gate();
         redundantIOPorts();
         for(int i=1;i<currModule.wires.get(2).ports.size();){
             Wire temp = newWire();
@@ -1692,22 +1692,15 @@ public class Compiler2 {
             ArrayList<String> output = scan(0,block,null);
             for(int k=0;k<output.size();k+=2){
                 if(output.size()>1){
-//                    assign(output.get(k)+" = "+output.get(k+1)+";");
-                    Wire wire = currModule.getWire(output.get(k));
-                    
                     Wire wire2 = currModule.getWire(output.get(k+1));
-                    if(wire2==null){
-                        if(wire!=null)
-                            for(int i=0;i<wire.size;i++){
-                                currModule.addWire(line+"_"+i,wire.size);
-                            }
-                        for(int i=0;i<currModule.wires.size();i++){
-                            wire = currModule.getWire(output.get(k)+"_"+i);
-                            wire2 = currModule.getWire(output.get(k+1)+"_"+i);
+                    if(wire2==null){ //for vectors
+                        for(int i=0;(wire2=currModule.getWire(output.get(k+1)+"_"+i))!=null;i++){
+                            Wire wire = currModule.getWire(output.get(k)+"_"+i);
                             wire2.ports.addAll(wire.ports);
                             currModule.wires.remove(wire);
                         }
-                    }else{ //if the above doesn't work, this stuff below works for non-vectors
+                    }else{ //for non-vectors
+                        Wire wire = currModule.getWire(output.get(k));
                         wire2.ports.addAll(wire.ports);
                         currModule.wires.remove(wire);
                     }
@@ -1799,6 +1792,9 @@ public class Compiler2 {
 //                    preMod(star,6);
                     list.add(ops[1].replaceAll("\\s","").replaceAll(";",""));
                     list.add(ops[0]);
+                }else if(currModule.getWire(ops[1].replaceAll("\\s","").replaceAll(";","")+"_0")!=null){ //check again, but for vectors this time
+                    list.add(ops[1].replaceAll("\\s","").replaceAll(";",""));
+                    list.add(ops[0]);
                 }else{
                     wire = newWire();
                     assign(wire.name+" ="+ops[1]);
@@ -1830,23 +1826,25 @@ public class Compiler2 {
                                 list2.remove(m);
                             }
                         }
-                        wire = newWire();
-                        assign(wire.name+" = "+ops[1]+" ? vcc : gnd;");
-                        wire2 = newWire();
-                        assign(wire2.name+" = ("+wire.name+") ? "+list.get(k)+" : " + ifFalse + ";");
-                        list3.add(wire2.name);
-                        list3.add(list.get(k+1));
+                        list3.addAll(createMux(list.get(k+1),list.get(k),ifFalse,ops[1]));
+//                        wire = newWire();
+//                        assign(wire.name+" = "+ops[1]+" ? vcc : gnd;");
+//                        wire2 = newWire();
+//                        assign(wire2.name+" = ("+wire.name+") ? "+list.get(k)+" : " + ifFalse + ";");
+//                        list3.add(wire2.name);
+//                        list3.add(list.get(k+1));
                     }
                 }
                 
                 for(int k=0;k<list2.size();k+=2){
                     if(list.size()>1){
-                        wire = newWire();
-                        assign(wire.name+" = "+ops[1]+" ? vcc : gnd;");
-                        wire2 = newWire();
-                        assign(wire2.name+" = ("+wire.name+") ? gnd : " + list2.get(k) + ";");
-                        list3.add(wire2.name);
-                        list3.add(list2.get(k+1));
+                        list3.addAll(createMux(list.get(k+1),"gnd",list2.get(k),ops[1]));
+//                        wire = newWire();
+//                        assign(wire.name+" = "+ops[1]+" ? vcc : gnd;");
+//                        wire2 = newWire();
+//                        assign(wire2.name+" = ("+wire.name+") ? gnd : " + list2.get(k) + ";");
+//                        list3.add(wire2.name);
+//                        list3.add(list2.get(k+1));
                     }
                 }
                 
@@ -1950,6 +1948,14 @@ public class Compiler2 {
         return total;
     }
     
+    /**
+     * Handle the case statements by creating cascaded muxes
+     * @param cases
+     * @param def
+     * @param in
+     * @param i
+     * @return 
+     */
     public ArrayList<String> caseHelper(ArrayList<ArrayList<String>> cases,ArrayList<String> def,String in,int i){
         String ifOne="gnd";
         ArrayList<String> list1=null;
@@ -1976,20 +1982,22 @@ public class Compiler2 {
                                     }
                                 }
                         }
-                        Wire wire = newWire();
-                        assign(wire.name+" = ("+in+"_"+i+") ? "+ifOne+" : "+cases.get(w).get(j)+";");
-                        list1.add(wire.name);
-                        list1.add(cases.get(w).get(j+1));
+                        list1.addAll(createMux(cases.get(w).get(j+1),ifOne,cases.get(w).get(j),"("+in+"_"+i+")"));
+//                        Wire wire = newWire();
+//                        assign(wire.name+" = ("+in+"_"+i+") ? "+ifOne+" : "+cases.get(w).get(j)+";");
+//                        list1.add(wire.name);
+//                        list1.add(cases.get(w).get(j+1));
                         ifOne="gnd";
                     }
                 
                 if(cases.get(w+1)!=null){
                     if(!cases.get(w+1).isEmpty()) //ensure that there is a case for current value +1
                         for(int k=0;k<cases.get(w+1).size();k+=2){ //loop through all the rest of the statements in the odd case
-                            Wire wire = newWire();
-                            assign(wire.name+" = ("+in+"_"+i+") ? "+cases.get(w+1).get(k)+" : gnd;");
-                            list1.add(wire.name);
-                            list1.add(cases.get(w+1).get(k+1));
+                            list1.addAll(createMux(cases.get(w+1).get(k+1),cases.get(w+1).get(k),"gnd","("+in+"_"+i+")"));
+//                            Wire wire = newWire();
+//                            assign(wire.name+" = ("+in+"_"+i+") ? "+cases.get(w+1).get(k)+" : gnd;");
+//                            list1.add(wire.name);
+//                            list1.add(cases.get(w+1).get(k+1));
                         }
                 }
             }
@@ -1999,6 +2007,48 @@ public class Compiler2 {
         if(out.size()>=2)
             return caseHelper(out,def,in,i+1);
         return list1;
+    }
+    
+    /**
+     * Helper method to create multiple muxes if necessary (for vectors)
+     * @param outputName
+     * @param ifOne the one condition
+     * @param ifZero the zero condition
+     * @param cond the conditional logic
+     * @return [output wire, final output wire]
+     */
+    public ArrayList<String> createMux(String outputName,String ifOne,String ifZero,String cond){
+        ArrayList<String> list = new ArrayList<>();
+        Wire wire = newWire();
+        assign(wire.name+" = "+cond+" ? vcc : gnd;");
+        Wire w = currModule.getWire(outputName);
+        int currentWire = numWires;
+        if(w==null){ //for vectors
+            for(int i=0;currModule.getWire(outputName+"_"+i)!=null;i++){
+                Wire wire2 = new Wire("MISC_"+currentWire+"_"+i,1);
+                currModule.wires.add(wire2);
+                numWires++;
+                if(ifZero.equals("gnd")||ifZero.equals("vcc"))
+                    if(ifOne.equals("gnd")||ifOne.equals("vcc"))
+                        assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +";");
+                    else
+                        assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +"_"+i+" : " + ifZero +";");
+                
+                else if(ifOne.equals("gnd")||ifOne.equals("vcc"))
+                    if(ifZero.equals("gnd")||ifZero.equals("vcc"))
+                        assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +";");
+                    else
+                    assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +"_"+i+";");
+                else
+                    assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +"_"+i+" : " + ifZero +"_"+i+";");
+            }
+        }else{ //for non-vectors
+            Wire wire2 = newWire();
+            assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +";");
+        }
+        list.add("MISC_"+currentWire);
+        list.add(outputName);
+        return list;
     }
     
      /*
