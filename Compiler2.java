@@ -356,7 +356,7 @@ public class Compiler2 {
         if(!VCC.ports.get(0).name.equals("VCC")){
             VCC.ports.add(0,new Port("VCC",(byte)1));
         }
-//        part2gate();
+        part2gate();
         redundantIOPorts();
         for(int i=1;i<currModule.wires.get(2).ports.size();){
             Wire temp = newWire();
@@ -1773,6 +1773,13 @@ public class Compiler2 {
                     type=2;
                     ops[2]=line.substring(i+1);
                     break;
+                }else if(line.charAt(i)=='['){ //handle single-bit calls on vectors
+                    ops[0]+="_";
+                    for(;line.charAt(j)!=']';j++)
+                        if(line.charAt(j)!=' ')
+                            ops[0]+=line.charAt(j);
+                    type=2;
+                    j=1;
                 }else if(line.charAt(i)!=' '){
                     ops[j]+=line.charAt(i);
                 }
@@ -1796,10 +1803,22 @@ public class Compiler2 {
                     list.add(ops[1].replaceAll("\\s","").replaceAll(";",""));
                     list.add(ops[0]);
                 }else{
-                    wire = newWire();
-                    assign(wire.name+" ="+ops[1]);
-                    list.add(wire.name);
-                    list.add(ops[0]);
+                    if(currModule.getWire(ops[0].replaceAll("\\s","").replaceAll(";",""))!=null){
+                        wire = newWire();
+                        assign(wire.name+" ="+ops[1]);
+                        list.add(wire.name);
+                        list.add(ops[0]);
+                    }else{
+                        int currentWire=numWires;
+                        for(int j=0;currModule.getWire(ops[0].replaceAll("\\s","").replaceAll(";","")+"_"+j)!=null;j++){
+                            wire = new Wire("MISC"+currentWire+"_"+j,1);
+                            currModule.wires.add(wire);
+                            numWires++;
+                        }
+                        assign("MISC"+currentWire+" ="+ops[1]);
+                        list.add("MISC"+currentWire);
+                        list.add(ops[0]);
+                    }
                 }
                 block.remove(index);
                 return list; //{output wire name, 'true' output wire name}
@@ -1965,8 +1984,14 @@ public class Compiler2 {
         for(int w=0;w<cases.size();w+=2){
             list1=null;
             if((cases.get(w)!=null)||(cases.get(w+1)!=null)){
-                if(cases.get(w)==null) cases.set(w,def); //set default
-                else if(cases.get(w+1)==null) cases.set(w+1,def); //set default
+                if(cases.get(w)==null){ //set default
+                    cases.set(w,new ArrayList<String>());
+                    cases.get(w).addAll(def);
+                }
+                else if(cases.get(w+1)==null){ //set default
+                    cases.set(w+1,new ArrayList<String>());
+                    cases.get(w+1).addAll(def);
+                }
                 list1 = new ArrayList<>();
                 if(cases.get(w)!=null) //make sure that there is a case for the current vale
                     for(int j=0;j<cases.get(w).size();j+=2){ //loop through all statements in an even case
