@@ -101,7 +101,7 @@ public class Module {
         else{
             for(i=0;i<names.length;i++){
                 for(int j=0;j<size;j++){
-                    wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,1));
+                    wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,size));
                     wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,(byte)1));
                 }
             }
@@ -122,7 +122,7 @@ public class Module {
         else{
             for(i=0;i<names.length;i++){
                 for(int j=0;j<size;j++){
-                    wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,1));
+                    wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,size));
                     wires.get(wires.size()-1).addPort(new Port(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,(byte)-1));
                 }
             }
@@ -141,7 +141,7 @@ public class Module {
         else{
             for(i=0;i<names.length;i++){
                 for(int j=0;j<size;j++){
-                    wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,1));
+                    wires.add(new Wire(names[i].replaceAll("\\s","").replaceAll(";","")+"_"+j,size));
                 }
             }
         }

@@ -28,6 +28,12 @@ public class Wire {
         this.ports = new ArrayList<>();
         for(Port port : wire.ports){
             Port temp = new Port(port);
+            Part tempP;
+            if(port.part!=null)
+                tempP = new Part(port.part);
+            else
+                tempP=null;
+            temp.part=tempP;
             this.ports.add(temp);
         }
     }

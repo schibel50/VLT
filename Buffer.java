@@ -13,7 +13,7 @@ public class Buffer extends Part{
     
     public Buffer(String name){
         super(name);
-        ports.add(new Port("in",this));
-        ports.add(new Port("out",this));
+        ports.add(new Port("In",this));
+        ports.add(new Port("Y",this));
     }
 }

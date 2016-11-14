@@ -37,17 +37,34 @@ public class EWriter {
         top.add("\t(edifLevel 0)");
         top.add("\t(keywordMap (keywordLevel 0))");
         top.add("\t(library beigebag");
-        top.add("\t\t(edifLevel 0");
+        top.add("\t\t(edifLevel 0)");
         top.add("\t\t(technology (numberDefinition))");
         top.add("\t\t(cell (cellType GENERIC)");
-        top.add("\t\t\t(view viewnameddefault (viewtype NETLIST)");
+        top.add("\t\t\t(view viewnamedefault (viewtype NETLIST)");
         top.add("\t\t\t\t(interface");
 
 //        NOT SURE WHAT TO DO HERE YET
 //        while(h<module.parts.size()){
 //            top.add("\t\t\t\t\t(port [name] (direction [direction]))");
 //        }
-        
+        boolean dffPresent = false;
+        for(Part part : module.parts){
+            String temp;
+            int a=0;
+            while(part.name.charAt(a)!='$' && a!=part.name.length())
+                a++;
+            temp=part.name.substring(0,a+1);
+            if(temp.equals("DFF$"))
+                dffPresent=true;
+        }
+        if(dffPresent){
+            top.add("\t\t\t\t\t(port S' (direction INPUT))");
+            top.add("\t\t\t\t\t(port Ck' (direction INPUT))");
+            top.add("\t\t\t\t\t(port D (direction INPUT))");
+            top.add("\t\t\t\t\t(port R' (direction INPUT))");
+            top.add("\t\t\t\t\t(port Q (direction OUTPUT))");
+            top.add("\t\t\t\t\t(port Q' (direction OUTPUT))");
+        }
         top.add("\t\t\t\t)))");
         top.add("\t)");
         top.add("\t(library DESIGNS (ediflevel 0) (technology (numberDefinition))");
@@ -59,8 +76,8 @@ public class EWriter {
         // add instances
         while(i<module.parts.size()){
             Part temp = module.parts.get(i);
-            instances.add("\t\t\t\t\t(instance " + temp.name + " (viewRef VIEWNAMEDEFAULT");
-            instances.add("\t\t\t\t\t\t(cellRef  (libraryRef " + "LIBRARY NAME" + "))");
+            instances.add("\t\t\t\t\t(instance " + temp.name + " (viewRef viewnamedefault");
+            instances.add("\t\t\t\t\t\t(cellRef  (libraryRef " + "beigebag" + "))");
             instances.add("\t\t\t\t\t\t))");
             i++;
         }
@@ -75,13 +92,13 @@ public class EWriter {
             int k=0;
             while(k<temp.ports.size()){
                 if(temp.ports.get(k).IO==1){ //port is an input
-                    IOs.add("\t\t\t\t\t(port " + temp.ports.get(k).name + "(direction input))");
-                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k).name);
+                    IOs.add("\t\t\t\t\t(port " + temp.ports.get(k).name + " (direction input))");
+                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k).name+")");
                 }else if(temp.ports.get(k).IO==-1){ //port is an output
-                    IOs.add("\t\t\t\t\t(port " + temp.ports.get(k).name + "(direction output))");
-                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k).name);
+                    IOs.add("\t\t\t\t\t(port " + temp.ports.get(k).name + " (direction output))");
+                    nets.add("\t\t\t\t\t\t\t(portRef " + outputName(temp.ports.get(k+1))+")");
                 }else
-                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k).name + " (instanceRef " + temp.ports.get(k).part.name + ")");
+                    nets.add("\t\t\t\t\t\t\t(portRef " + temp.ports.get(k).name + " (instanceRef " + temp.ports.get(k).part.name + "))");
                 k++;
             }
             nets.add("\t\t\t\t\t\t))");
@@ -95,5 +112,15 @@ public class EWriter {
         nets.add("(design root");
         nets.add("\t\t(cellref toplevel");
         nets.add("\t\t\t(libraryRef DESIGNS))))");
+    }
+    
+    public String outputName(Port port){
+        Part part = port.part;
+        String portName = port.name;
+        for(int i=0;i<part.ports.size();i++){
+            if(portName.equals(part.ports.get(i).name))
+                return part.name+"_"+(i+1);
+        }
+        return part.name;
     }
 }

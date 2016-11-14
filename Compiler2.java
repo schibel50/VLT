@@ -56,6 +56,7 @@ public class Compiler2 {
     public int numExtras;
     public int numExtraWires;
     public int numDFFs;
+    public int numTSBs;
     
     //wires that lead to ground, vcc, or indicate a floating pin
     public Wire GND;
@@ -100,6 +101,7 @@ public class Compiler2 {
         numExtraWires=0;
         numDFFs=0;
         numBuffs=0;
+        numTSBs=0;
     }
     
     /*
@@ -174,6 +176,8 @@ public class Compiler2 {
             currModule = modules.get(j);
             for(int i=currModule.start; i<currModule.end; i++){
                 //make sure the line is not empty and is not a comment
+                if(i==240)
+                    System.out.println();
                 if(!code.get(i).isEmpty() && code.get(i).length() > 2){
                     //add all the inputs
                     if(code.get(i).substring(0,5).equals("input")){
@@ -221,9 +225,9 @@ public class Compiler2 {
                                 int vcc = 0;
                                 for(int k = 0; k < temp.length; k++){
                                     temp[k] = temp[k].trim();
-                                    if(temp[k].equals("gnd")||temp[k].equals("ground"))
+                                    if(temp[k].contains("gnd")||temp[k].contains("ground"))
                                         gnd++;
-                                    else if(temp[k].equals("vcc"))
+                                    else if(temp[k].contains("vcc"))
                                         vcc++;
                                 }
                                 if(gnd==0&&vcc==0){
@@ -258,6 +262,7 @@ public class Compiler2 {
                             assign(code.get(i).substring(7));
                     }
                     //compile an 'always' block
+                    //compile an 'always' block
                     else if(code.get(i).substring(0,6).equals("always")){
                         ArrayList<String> myAlways = new ArrayList<String>();
                         int count=0;
@@ -265,7 +270,7 @@ public class Compiler2 {
                         i++;
                        do{
                             if(!code.get(i).isEmpty()){
-                                if(code.get(i).length() > 2){
+                                if((code.get(i).length() > 2)&&(code.get(i).length() < 7)){
                                     if(code.get(i).substring(0,3).equals("end"))
                                     count--;
                                 }
@@ -353,8 +358,19 @@ public class Compiler2 {
         if(!VCC.ports.get(0).name.equals("VCC")){
             VCC.ports.add(0,new Port("VCC",(byte)1));
         }
-//        part2gate();
+        part2gate();
         redundantIOPorts();
+        for(int i=1;i<currModule.wires.get(2).ports.size();i++){
+            boolean entered=false;
+            for(Part part : currModule.parts){
+                if(currModule.wires.get(2).ports.get(i).part.name.equals(part.name))
+                    entered=true;
+            }
+            if(!entered){
+                currModule.wires.get(2).ports.remove(i);
+                i--;
+            }
+        }
         for(int i=1;i<currModule.wires.get(2).ports.size();){
             Wire temp = newWire();
             temp.ports.add(new Port(currModule.wires.get(2).ports.get(i)));
@@ -369,6 +385,20 @@ public class Compiler2 {
         currModule.wires.get(0).ports.add(0,GndPart.ports.get(0));
         currModule.wires.get(1).ports.remove(0);
         currModule.wires.get(1).ports.add(0,VccPart.ports.get(0));
+        if(currModule.wires.get(0).ports.size()==1){
+            currModule.wires.remove(0);
+            currModule.parts.remove(0);
+        }
+        else if(currModule.wires.get(1).ports.size()==1){
+            currModule.wires.remove(1);
+            currModule.parts.remove(1);
+        }
+        if(currModule.wires.get(0).name.equals("vcc")){
+            if(currModule.wires.get(0).ports.size()==1){
+                currModule.wires.remove(0);
+                currModule.parts.remove(0);
+            }
+        }
 //        addBuffers();
         edif = new EWriter(modules.get(0));
         edif.write();
@@ -447,6 +477,10 @@ public class Compiler2 {
         else if(name.contains("DFF$")){
             temp = temp + ((numDFFs/2)+1) + letters[numDFFs%2];
             numDFFs++;
+        }
+        else if(name.contains("TSB$")){
+            temp=temp+((numTSBs/2)+1)+letters[numTSBs%2];
+            numTSBs++;
         }
         else{
             temp = temp+numExtras;
@@ -531,7 +565,7 @@ public class Compiler2 {
         }
         else if(myMod==3){
             if(myWires.length==3)
-                assign(myWires[0].name+" = "+myWires[1].name+ " ~ "+myWires[2].name+";");
+                assign(myWires[0].name+" = "+myWires[1].name+ " ~& "+myWires[2].name+";");
             else if(myWires.length==4){
                 NAND3 myNAND3 = new NAND3(newName("NAND3$"));
                 currModule.parts.add(myNAND3);
@@ -571,23 +605,27 @@ public class Compiler2 {
                 myWires[4].ports.add(myNOR4.ports.get(3));
             }
         }
-        else if(myMod==2){
+        else if(myMod==5){
             assign(myWires[0].name+" = "+myWires[1].name+" ~^ "+myWires[2].name+";");
         }
         else if(myMod==6){
             Buffer newBuff = new Buffer(newName("BUFF$"));
+            myWires[myWires.length-2].ports.add(newBuff.ports.get(1));
             myWires[myWires.length-1].ports.add(newBuff.ports.get(0));
-            for(int i = 0; i < myWires.length-1;i++)
-                myWires[i].ports.add(newBuff.ports.get(1));
             currModule.parts.add(newBuff);
         }
         else if(myMod==7){
             Inverter newInv = new Inverter(newName("INV$"));
-            numInverters++;
+            myWires[myWires.length-2].ports.add(newInv.ports.get(1));
             myWires[myWires.length-1].ports.add(newInv.ports.get(0));
-            for(int i = 0; i < myWires.length-1;i++)
-                myWires[i].ports.add(newInv.ports.get(1));
             currModule.parts.add(newInv);
+        }
+        else if(myMod==8){
+            TSB newTSB = new TSB(newName("TSB$"));
+            myWires[myWires.length-3].ports.add(newTSB.ports.get(1));
+            myWires[myWires.length-2].ports.add(newTSB.ports.get(0));
+            myWires[myWires.length-1].ports.add(newTSB.ports.get(2));
+            currModule.parts.add(newTSB);
         }
 //        else if(myMod==8){
 //            Buffer newBuff = new Buffer("Buff"+numBuffs);
@@ -625,31 +663,6 @@ public class Compiler2 {
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-    
-    public void addBuffers(){
-        Buffer currBuff;
-        Wire currWire;
-        for(int i=0;i<currModule.wires.size();i++){
-            for(int j=0;j<currModule.wires.get(i).ports.size();j++){
-                if(currModule.wires.get(i).ports.get(j).part==null&&
-                        currModule.wires.get(i).ports.get(j).IO==(byte)1&&
-                        currModule.wires.get(i).ports.get(j).name.equals(currModule.wires.get(i).name)){
-                    currBuff = new Buffer(newName("BUFF$"));
-                    currWire = newWire();
-                    currModule.parts.add(currBuff);
-                    currWire.ports.add(currBuff.ports.get(1));
-                    for(int k=0;k<currModule.wires.get(i).ports.size();k++){
-                        if(currModule.wires.get(i).ports.get(k).part!=null){
-                           currWire.ports.add(currModule.wires.get(i).ports.get(k));
-                           currModule.wires.get(i).ports.remove(k);
-                           k--;
-                        }
-                    }
-                    currModule.wires.get(i).ports.add(currBuff.ports.get(0));
                 }
             }
         }
@@ -747,6 +760,16 @@ public class Compiler2 {
                             }
                         }
                     }
+                    for(int k=0;k<module.wires.get(2).ports.size();k++){
+                        if(module.wires.get(2).ports.get(k).part!=null){
+                            if(module.wires.get(2).ports.get(k).part.name.equals(currName)){
+                                Port newPort = new Port(module.wires.get(2).ports.get(k));
+                                Part temp = new Part(tempMod.parts.get(j));
+                                newPort.part = temp;
+                                module.wires.get(2).ports.add(newPort);
+                            }
+                        }
+                    }
                     Part temp = new Part(tempMod.parts.get(j));
                     module.parts.add(temp);
                 }
@@ -819,368 +842,6 @@ public class Compiler2 {
             }
         }
     }
-    
-//    public void insertMod(Module module){
-//        for(int i=0;i<module.parts.size();i++){
-//            if(module.parts.get(i).name.contains("MOD_")){
-//                if(module.parts.get(i).name.contains("enableLogic")){
-//                    System.out.println();
-//                }
-//                ArrayList<Wire> newWires = new ArrayList<Wire>();
-//                ArrayList<Part> newParts = new ArrayList<Part>();
-//                String[] modIOs = null;
-//                for(int j=0;j<modules.size();j++){
-//                    if(modules.get(j).name.equals(module.parts.get(i).name.substring(4))){
-//                        modIOs=modules.get(j).ioNames;
-//                        for(Wire wire : modules.get(j).wires){
-//                            Wire tempW = new Wire(wire);
-//                            newWires.add(tempW);
-//                        }
-//                        for(Part part : modules.get(j).parts){
-//                            Part temp = new Part(part);
-//                            newParts.add(temp);
-//                        }
-//                    }
-//                }
-//                ArrayList<Wire[]> myWires = new ArrayList<Wire[]>();
-//                for(int j=0;j<module.parts.get(i).ports.size();j++){
-//                    if(module.parts.get(i).ports.get(j).name.endsWith("]")){
-//                        Wire[] temp = new Wire[1];
-//                        module.parts.get(i).ports.get(j).name = module.parts.get(i).ports.get(j).name.replace('[','_');
-//                        module.parts.get(i).ports.get(j).name = module.parts.get(i).ports.get(j).name.substring(0,module.parts.get(i).ports.get(j).name.length()-1);
-//                        for(Wire wire : module.wires){
-//                            if(wire.name.equals(module.parts.get(i).ports.get(j).name))
-//                                temp[0]=wire;
-//                        }
-//                        myWires.add(j,temp);
-//                    }
-//                    else{
-//                        int wordSize=module.parts.get(i).ports.get(j).name.length();
-//                        int size=0;
-//                        for(Wire wire : module.wires){
-//                            if(wire.name.length()>=wordSize){
-//                                    if(wire.name.length()>wordSize&&wire.name.substring(0,wordSize).equals(module.parts.get(i).ports.get(j).name)){
-//                                        if(wire.name.charAt(wordSize)=='_')
-//                                        size++;
-//                                    }
-//                                    else if(wire.name.length()==wordSize&&wire.name.equals(module.parts.get(i).ports.get(j).name))
-//                                        size++;
-//                            }
-//                        }
-//                        if(size==1){
-//                            Wire[] temp = new Wire[1];
-//                            for(Wire wire : module.wires){
-//                                if(wire.name.equals(module.parts.get(i).ports.get(j).name)){
-//                                    temp[0]=wire;
-//                                }
-//                            }
-//                            myWires.add(j,temp);
-//                        }
-//                        else{
-//                            Wire[] temp = new Wire[size];
-//                            for(Wire wire : module.wires){
-//                                if(wire.name.length()>=wordSize){
-//                                    if(wire.name.length()>wordSize&&wire.name.substring(0,wordSize).equals(module.parts.get(i).ports.get(j).name)){
-//                                        if(wire.name.charAt(wordSize)=='_')
-//                                        temp[Integer.parseInt(wire.name.substring(wordSize+1))]=wire;
-//                                    }
-//                                    else if(wire.name.length()==wordSize&&wire.name.equals(module.parts.get(i).ports.get(j).name))
-//                                        temp[Integer.parseInt(wire.name.substring(wordSize+1))]=wire;
-//                                }
-//                            }
-//                            myWires.add(j,temp);
-//                        }
-//                    }
-//                }
-//                for(int j=0;j<newParts.size();j++){
-//                    String currName = newParts.get(j).name;
-//                    if(!newParts.get(j).name.substring(0,3).equals("MOD"))
-//                        newParts.get(j).name = newParts.get(j).name+"_"+numExtras;numExtras++;
-//                    for(Wire wire : newWires){
-//                        for(int k=0;k<wire.ports.size();k++){
-//                            if(wire.ports.get(k).part==null){
-//                                wire.ports.remove(k);
-//                                k--;
-//                            }
-//                            else if(wire.ports.get(k).part.name.equals(currName)){
-//                                Part temp = new Part(newParts.get(j));
-//                                wire.ports.get(k).part=temp;
-//                            }
-//                            else{
-//                                Part temp = new Part(wire.ports.get(k).part);
-//                                wire.ports.get(k).part=temp;
-//                            }
-//                        }
-//                    }
-//                    Part temp = new Part(newParts.get(j));
-//                    newParts.get(j).name = currName;
-//                    module.parts.add(temp);
-//                }
-//                ArrayList<Wire[]> modWires = new ArrayList<Wire[]>();
-//                for(int j=0;j<modIOs.length;j++){
-//                    int wordSize=modIOs[j].length();
-//                    int size=0;
-//                    for(Wire wire : newWires){
-//                        if(wire.name.length()>=wordSize){
-//                            if(wire.name.substring(0,wordSize).equals(modIOs[j]))
-//                                size++;
-//                        }
-//                    }
-//                    if(size==1){
-//                        Wire[] temp = new Wire[1];
-//                        for(Wire wire : newWires){
-//                            if(wire.name.equals(modIOs[j])){
-//                                temp[0]=wire;
-//                            }
-//                        }
-//                        modWires.add(j,temp);
-//                    }
-//                    else{
-//                        Wire[] temp = new Wire[size];
-//                        for(Wire wire : newWires){
-//                            if(wire.name.length()>=wordSize){
-//                                if(wire.name.substring(0,wordSize).equals(modIOs[j])){
-//                                    temp[Integer.parseInt(wire.name.substring(wordSize+1))]=wire;
-//                                }
-//                            }
-//                        }
-//                        modWires.add(j,temp);
-//                    }
-//                }
-//                
-//                for(int j=0;j<modWires.size();j++){
-//                    for(int k=0;k<modWires.get(j).length;k++){
-//                        for(int l=0;l<newWires.size();l++){
-//                            if(newWires.get(l).name.equals(modWires.get(j)[k].name))
-//                                newWires.remove(l);
-//                        }
-//                        if(!myWires.get(j)[0].name.equals("float")){
-//                            for(Port port : modWires.get(j)[k].ports){
-//                                Port temp = new Port(port);
-//                                myWires.get(j)[k].ports.add(temp);
-//                            }
-//                        }
-//                    }
-//                }
-//                for(Wire wire : newWires){
-//                    Wire temp = new Wire(wire);
-//                    if(temp.name.equals("gnd")||temp.name.equals("ground")||temp.name.equals("GND")){
-//                        for(Port port : temp.ports){
-//                            Port temp2 = new Port(port);
-//                            modules.get(0).wires.get(0).ports.add(temp2);
-//                        }
-//                    }
-//                    else if(temp.name.equals("vcc")||temp.name.equals("VCC")){
-//                        for(Port port : temp.ports){
-//                            Port temp2 = new Port(port);
-//                            modules.get(0).wires.get(1).ports.add(temp2);
-//                        }
-//                    }
-//                    else{
-//                        temp.name+="_"+numExtraWires;numExtraWires++;
-//                        module.wires.add(temp);
-//                    }
-//                }
-//                module.parts.remove(i);
-//                i--;
-//            }
-//        }
-//    }
-    /*
-    After all of the modules have been evaluated, this method inserts
-    modules into the main module wherever they were evaualated in 
-    the code.
-    */
-//    public void insertMod(Module module){
-//        for(int i=0;i<module.parts.size();i++){
-//            if(module.parts.get(i).name.contains("MOD_")){
-//                String[] myIONames;
-//                ArrayList<Wire[]> myWires = new ArrayList<Wire[]>();
-//                for(int j=0;j<modules.size();j++){
-//                    if(modules.get(j).name.equals(module.parts.get(i).name.substring(4))){
-//                        myIONames = modules.get(j).ioNames;
-//                        Module newMod = new Module("temp",-1,-1,myIONames);
-//                        ArrayList<Wire> newWires = new ArrayList<Wire>();
-//                        ArrayList<Part> newParts = new ArrayList<Part>();
-//                        for(Wire wire : modules.get(j).wires){
-//                            Wire temp = new Wire(wire);
-//                            newWires.add(temp);
-//                        }
-//                        for(Part part : modules.get(j).parts){
-//                            Part temp = new Part(part);
-//                            if(!temp.name.substring(0,3).equals("MOD"))
-//                                temp.name+="_"+numExtras;numExtras++;
-//                            for(Wire wire : newWires){
-//                                for(int k=0;k<wire.ports.size();k++){
-//                                    if(wire.ports.get(k).part!=null){
-//                                        if(wire.ports.get(k).part.name.equals(part.name))
-//                                            wire.ports.get(k).part=temp;
-//                                    }
-//                                }
-//                            }
-//                            newParts.add(temp);
-//                        }
-//                        newMod.parts=newParts;
-//                        newMod.wires=newWires;
-//                        for(int k=0;k<module.parts.get(i).ports.size();k++){
-//                            if(module.parts.get(i).ports.get(k).name.endsWith("]")){
-//                                Wire[] temp = new Wire[1];
-//                                module.parts.get(i).ports.get(k).name = module.parts.get(i).ports.get(k).name.replace('[','_');
-//                                module.parts.get(i).ports.get(k).name = module.parts.get(i).ports.get(k).name.substring(0,module.parts.get(i).ports.get(k).name.length()-1);
-//                                for(Wire wire : module.wires){
-//                                    if(wire.name.equals(module.parts.get(i).ports.get(k).name))
-//                                        temp[0]=wire;
-//                                }
-//                                myWires.add(k,temp);
-//                            }
-//                            else{
-//                                int wordSize=module.parts.get(i).ports.get(k).name.length();
-//                                int size=0;
-//                                for(Wire wire : module.wires){
-//                                    if(wire.name.length()>=wordSize){
-//                                            if(wire.name.length()>wordSize&&wire.name.substring(0,wordSize).equals(module.parts.get(i).ports.get(k).name)){
-//                                                if(wire.name.charAt(wordSize)=='_')
-//                                                size++;
-//                                            }
-//                                            else if(wire.name.length()==wordSize&&wire.name.equals(module.parts.get(i).ports.get(k).name))
-//                                                size++;
-//                                    }
-//                                }
-//                                if(size==1){
-//                                    Wire[] temp = new Wire[1];
-//                                    for(Wire wire : module.wires){
-//                                        if(wire.name.equals(module.parts.get(i).ports.get(k).name)){
-//                                            temp[0]=wire;
-//                                        }
-//                                    }
-//                                    myWires.add(k,temp);
-//                                }
-//                                else{
-//                                    Wire[] temp = new Wire[size];
-//                                    for(Wire wire : module.wires){
-//                                        if(wire.name.length()>=wordSize){
-//                                            if(wire.name.length()>wordSize&&wire.name.substring(0,wordSize).equals(module.parts.get(i).ports.get(k).name)){
-//                                                if(wire.name.charAt(wordSize)=='_')
-//                                                temp[Integer.parseInt(wire.name.substring(wordSize+1))]=wire;
-//                                            }
-//                                            else if(wire.name.length()==wordSize&&wire.name.equals(module.parts.get(i).ports.get(k).name))
-//                                                temp[Integer.parseInt(wire.name.substring(wordSize+1))]=wire;
-//                                        }
-//                                    }
-//                                    myWires.add(k,temp);
-//                                }
-//                            }
-//                        }
-////                        for(int k=0;k<newMod.parts.size();k++){
-////                            for(int m=0;m<newMod.wires.size();m++){
-////                                for(int l=0;l<newMod.wires.get(m).ports.size();l++){
-////                                    if(newMod.wires.get(m).ports.get(l).part!=null &&
-////                                            !newMod.wires.get(m).ports.get(l).part.name.equals(newMod.parts.get(k).name))
-////                                        newMod.wires.get(m).ports.get(l).part=newMod.parts.get(k);
-////                                }
-////                            }
-////                        }
-//                        for(int k=0;k<newMod.parts.size();k++){
-//                            Part temp = new Part(newMod.parts.get(k));
-//                            module.parts.add(temp);
-//                        }
-//                        ArrayList<Wire[]> modWires = new ArrayList<Wire[]>();
-//                        for(int k=0;k<myIONames.length;k++){
-//                            int wordSize=myIONames[k].length();
-//                            int size=0;
-//                            for(Wire wire : newWires){
-//                                if(wire.name.length()>=wordSize){
-//                                    if(wire.name.substring(0,wordSize).equals(myIONames[k]))
-//                                        size++;
-//                                }
-//                            }
-//                            if(size==1){
-//                                Wire[] temp = new Wire[1];
-//                                for(Wire wire : newWires){
-//                                    if(wire.name.equals(myIONames[k])){
-//                                        temp[0]=wire;
-//                                    }
-//                                }
-//                                modWires.add(k,temp);
-//                            }
-//                            else{
-//                                Wire[] temp = new Wire[size];
-//                                for(Wire wire : newWires){
-//                                    if(wire.name.length()>=wordSize){
-//                                        if(wire.name.substring(0,wordSize).equals(myIONames[k])){
-//                                            temp[Integer.parseInt(wire.name.substring(wordSize+1))]=wire;
-//                                        }
-//                                    }
-//                                }
-//                                modWires.add(k,temp);
-//                            }
-//                        }
-//                        for(int k=0;k<modWires.size();k++){
-//                            for(int l=0;l<modWires.get(k).length;l++){
-//                                for(int m=0;m<modWires.get(k)[l].ports.size();m++){
-//                                    if(k<myWires.size())
-//                                        myWires.get(k)[l].ports.add(modWires.get(k)[l].ports.get(m));
-//                                    else
-//                                        FLOAT.ports.add(modWires.get(k)[l].ports.get(m));
-//                                }
-//                            }
-//                        }
-//                        for(int k=0;k<newMod.wires.size();k++){
-//                            boolean add=true;
-//                            for(int l=0;l<myIONames.length;l++){
-//                                if(newMod.wires.get(k).name.contains(myIONames[l]))
-//                                    add=false;
-//                            }
-//                            if(add){
-//                                boolean justAdd=true;
-//                                for(int l=0;l<newMod.wires.get(k).ports.size();l++){
-//                                    for(int m=0;m<myIONames.length;m++){
-//                                        if(newMod.wires.get(k).ports.get(l).name.equals(myIONames[m])){
-//                                            for(int n=0;n<newMod.wires.get(k).ports.size();n++){
-//                                                if(newMod.wires.get(k).ports.get(n).part!=null)
-//                                                    for(int o=0;o<myWires.get(m).length;o++){
-//                                                        myWires.get(m)[o].ports.add(newMod.wires.get(k).ports.get(n));
-//                                                        justAdd=false;
-//                                                    }
-//                                            }
-//                                        }
-//                                    }
-//                                }
-//                                if(justAdd){
-//                                    Wire temp = new Wire(newMod.wires.get(k));
-//                                    temp.name+="_"+numExtraWires;
-//                                    numExtraWires++;
-//                                    module.wires.add(temp);
-//                                }
-//                            }
-//                        }
-////                        for(int k=0;k<myWires.size();k++){
-////                            for(int l=0;l<myIONames.length;l++){
-////                                for(int m=0;m<myWires.get(k).length;m++){
-////                                    for(int n=0;n<myWires.get(k)[m].ports.size();n++){
-////                                        if(myWires.get(k)[m].ports.get(n).name.equals(myIONames[l]))
-////                                            if(myWires.get(k)[m].ports.get(n).part==null)
-////                                                myWires.get(k)[m].ports.remove(n);
-////                                    }
-////                                }
-////                            }
-////                        }
-//                        for(int k=0;k<myWires.size();k++){
-//                            for(int m=0;m<myWires.get(k).length;m++){
-//                                for(int n=0;n<myWires.get(k)[m].ports.size();n++){
-//                                    if(myWires.get(k)[m].ports.get(n).part==null&&!(myWires.get(k)[m].ports.get(n).name.equals(myWires.get(k)[m].name)))
-//                                        myWires.get(k)[m].ports.remove(n);
-//                                }
-//                            }
-//                        }
-//                        module.parts.remove(i);
-//                        newMod.clear();
-//                        i--;
-//                    }
-//                }
-//            }
-//        }
-//    }
     
     /*
     Whenever an input, output, or wire has more than one bit,
@@ -1664,8 +1325,20 @@ public class Compiler2 {
         while (block.size()>0) { //go through the rest of the block
             ArrayList<String> output = scan(0,block,null);
             for(int k=0;k<output.size();k+=2){
-                if(output.size()>1)
-                    assign(output.get(k-1)+"="+output.get(k)+";");
+                if(output.size()>1){
+                    Wire wire2 = currModule.getWire(output.get(k+1));
+                    if(wire2==null){ //for vectors
+                        for(int i=0;(wire2=currModule.getWire(output.get(k+1)+"_"+i))!=null;i++){
+                            Wire wire = currModule.getWire(output.get(k)+"_"+i);
+                            wire2.ports.addAll(wire.ports);
+                            currModule.wires.remove(wire);
+                        }
+                    }else{ //for non-vectors
+                        Wire wire = currModule.getWire(output.get(k));
+                        wire2.ports.addAll(wire.ports);
+                        currModule.wires.remove(wire);
+                    }
+                }
             }
         }
         return null;
@@ -1679,6 +1352,7 @@ public class Compiler2 {
      * @return code for what kind of statement it was
      */
     public ArrayList<String> scan(int index,ArrayList<String> block,String ifLogic){
+        
         String[] ops = {"","",""}; //[lop,op,rop]
         String line = block.get(index);
         String out = null;
@@ -1690,9 +1364,13 @@ public class Compiler2 {
                 ops[1]=line.substring(2);
                 type=1;
             }
-        }if(line.length()>=7){
+        }if(line.length()>=4){
+            if(line.substring(0,4).equals("else")){
+                type=3;
+            }
+        }if(line.length()>=8){
             if(line.substring(0,8).equals("else if ")||line.substring(0,8).equals("else if(")){
-                ops[1]=line.substring(7);
+                ops[1]=line.substring(8);
                 type=1;
             }
             //break;
@@ -1702,17 +1380,16 @@ public class Compiler2 {
         }if(line.length()>=7){
             if(line.substring(0,7).equals("endcase"))
                 type=-3;
-        }if(line.length()>=4){
-            if(line.substring(0,4).equals("else")){
-                type=3;
-            }
         }if(line.length()>=5){
             if(line.substring(0,5).equals("begin")){
                 type=-1;
             }
         }if(line.length()>=4){
             if(line.substring(0,4).equals("case")){
-                ops[1]=line.substring(4);
+                int j=0;
+                for(i=4;i<line.length();i++)
+                    if((line.charAt(i)!='(')&&(line.charAt(i)!=')')&&(line.charAt(i)!=' '))
+                        ops[1]+=line.charAt(i);
                 type=4;
             }
         }if(type==0){
@@ -1730,6 +1407,13 @@ public class Compiler2 {
                     type=2;
                     ops[2]=line.substring(i+1);
                     break;
+                }else if(line.charAt(i)=='['){ //handle single-bit calls on vectors
+                    ops[0]+="_";
+                    for(;line.charAt(j)!=']';j++)
+                        if(line.charAt(j)!=' ')
+                            ops[0]+=line.charAt(j);
+                    type=2;
+                    j=1;
                 }else if(line.charAt(i)!=' '){
                     ops[j]+=line.charAt(i);
                 }
@@ -1739,15 +1423,37 @@ public class Compiler2 {
         ArrayList<String> temp;
         ArrayList<String> list2; //for else block statements
         ArrayList<String> list3 = new ArrayList<>();
-        Wire wire;
+        Wire wire, wire2; //internal wires to be used
         switch(type){
             case 0: //'assign' statement
-                wire = new Wire("MISC"+numWires,currModule.getWire(ops[0]).size);
-                numWires++;
-                currModule.wires.add(wire);
-                assign(wire.name+"="+ops[1]+";");
-                list.add(wire.name);
-                list.add(ops[0]);
+                if(currModule.getWire(ops[1].replaceAll("\\s","").replaceAll(";",""))!=null){ //see if we are just setting a wire to an existing wire
+//                    String[] star = new String[2];
+//                    star[0]=ops[1];
+//                    star[1]=wire.name;
+//                    preMod(star,6);
+                    list.add(ops[1].replaceAll("\\s","").replaceAll(";",""));
+                    list.add(ops[0]);
+                }else if(currModule.getWire(ops[1].replaceAll("\\s","").replaceAll(";","")+"_0")!=null){ //check again, but for vectors this time
+                    list.add(ops[1].replaceAll("\\s","").replaceAll(";",""));
+                    list.add(ops[0]);
+                }else{
+                    if(currModule.getWire(ops[0].replaceAll("\\s","").replaceAll(";",""))!=null){
+                        wire = newWire();
+                        assign(wire.name+" ="+ops[1]);
+                        list.add(wire.name);
+                        list.add(ops[0]);
+                    }else{
+                        int currentWire=numWires;
+                        for(int j=0;currModule.getWire(ops[0].replaceAll("\\s","").replaceAll(";","")+"_"+j)!=null;j++){
+                            wire = new Wire("MISC"+currentWire+"_"+j,1);
+                            currModule.wires.add(wire);
+                            numWires++;
+                        }
+                        assign("MISC"+currentWire+" ="+ops[1]);
+                        list.add("MISC"+currentWire);
+                        list.add(ops[0]);
+                    }
+                }
                 block.remove(index);
                 return list; //{output wire name, 'true' output wire name}
                 
@@ -1773,21 +1479,25 @@ public class Compiler2 {
                                 list2.remove(m);
                             }
                         }
-                        wire = new Wire("MISC"+numWires,currModule.getWire(list.get(k+1)).size);
-                        numWires++;
-                        currModule.wires.add(wire);
-                        list3.add(assign(wire.name+" = "+ops[1]+" ? "+list.get(k)+" : " + ifFalse + ";"));
-                        list3.add(list.get(k+1));
+                        list3.addAll(createMux(list.get(k+1),list.get(k),ifFalse,ops[1]));
+//                        wire = newWire();
+//                        assign(wire.name+" = "+ops[1]+" ? vcc : gnd;");
+//                        wire2 = newWire();
+//                        assign(wire2.name+" = ("+wire.name+") ? "+list.get(k)+" : " + ifFalse + ";");
+//                        list3.add(wire2.name);
+//                        list3.add(list.get(k+1));
                     }
                 }
                 
                 for(int k=0;k<list2.size();k+=2){
                     if(list.size()>1){
-                        wire = new Wire("MISC"+numWires,currModule.getWire(list2.get(k+1)).size);
-                        numWires++;
-                        currModule.wires.add(wire);
-                        list3.add(assign(wire.name+" = "+ops[1]+" ? gnd : " + list2.get(k) + ";"));
-                        list3.add(list2.get(k+1));
+                        list3.addAll(createMux(list.get(k+1),"gnd",list2.get(k),ops[1]));
+//                        wire = newWire();
+//                        assign(wire.name+" = "+ops[1]+" ? vcc : gnd;");
+//                        wire2 = newWire();
+//                        assign(wire2.name+" = ("+wire.name+") ? gnd : " + list2.get(k) + ";");
+//                        list3.add(wire2.name);
+//                        list3.add(list2.get(k+1));
                     }
                 }
                 
@@ -1804,44 +1514,61 @@ public class Compiler2 {
                 
                 block.remove(index);
                 return list;
+                
             case 4: //case block
-                ArrayList<String> odds = new ArrayList<>();
-                ArrayList<String> evens = new ArrayList<>();
                 temp = scan(index+1,block,null);
-                while(!temp.get(0).equals("endcase")){
-                    list.addAll(temp);
+                ArrayList<String> last=null; //hold the previous case list
+                ArrayList<ArrayList<String>> cases = new ArrayList<>(); //set size based on select bit width
+                ArrayList<String> def=null;
+                String in = ops[1];
+                //int j=0;
+                if(currModule.getWire(in)!=null){ //if the bit size is one
+                    cases.add(null);
+                    cases.add(null);
+                }else //if the bit size is more than one
+                    while(cases.size()<Math.pow(2,currModule.getWire(in+"_0").size)){ //fill the list with null lists before getting the cases
+                        cases.add(null);
+                    }
+                
+                while(!temp.get(0).equals("endcase")){ //retrieve all the 'cases'
+                    if(temp.get(0).equals("default")){
+                        temp.remove(0);
+                        def = temp;
+                    }else{
+                        int num = Integer.parseInt(temp.get(0));
+                        temp.remove(0);
+                        cases.set(num,temp);
+                    }
                     temp = scan(index+1,block,null);
                 }
                 
-                block.add(index+1,"end");
-                temp.remove(0);
-                for(String str:temp){
-                    block.add(index+1,str);
-                }
-                block.add(index+1,"begin");
-                block.add(index+1,"else");
-                block.add(index+1,"end");
-                for(String str:temp){
-                    block.add(index+1,str);
-                }
-                block.add(index+1,"begin");
-                block.add(index+1,"if ()");
+                list3 = caseHelper(cases,def,in,0); //create cascaded muxes with all the cases
                 
-            
                 block.remove(index);
                 return list3;
+                
             case 2: //a 'case' in a case block
                 //ops={1,b0,statement}
-                list.add("`" + numberMaker(ops[1]));
+                if(ops[0].equals("default"))
+                    list.add("default");
+                else
+                    list.add(""+numberMaker(ops[1]));
                 block.set(index,ops[2]);
-                String str = block.remove(index);
-                if(str.isEmpty()||str.equals(" "))
-                    while(!str.equals("end")){
-                        list.add(str);
-                        str = block.remove(index);
+                
+                if(block.get(index).equals("")||block.get(index).equals(" ")){
+                    block.remove(index+1); //remove the 'begin'
+                    temp = scan(index+1,block,null);
+                    while(!temp.get(0).equals("end")){
+                    list.addAll(temp);
+                    temp = scan(index+1,block,null);
                     }
-                list.add(str);
-                return list; //{case id,WHOLE STATEMENTS...}
+                    block.remove(index);
+                }else{
+                    temp = scan(index,block,null);
+                    list.addAll(temp);
+                }
+                return list; //{case id,stuff...}
+                
             case -1: //begin statement
                 list.add("begin");
                 block.remove(index);
@@ -1852,8 +1579,10 @@ public class Compiler2 {
                 return list;
             case -3: //endcase statement
                 list.add("endcase");
+                block.remove(index);
                 return list;
             }
+        
         return null;
     }
     /**
@@ -1871,6 +1600,115 @@ public class Compiler2 {
         }
         return total;
     }
+    
+    /**
+     * Handle the case statements by creating cascaded muxes
+     * @param cases
+     * @param def
+     * @param in
+     * @param i
+     * @return 
+     */
+    public ArrayList<String> caseHelper(ArrayList<ArrayList<String>> cases,ArrayList<String> def,String in,int i){
+        String ifOne="gnd";
+        ArrayList<String> list1=null;
+        ArrayList<ArrayList<String>> out = new ArrayList<>();
+        while(out.size()<cases.size()/2) //fill the list with null slots
+            out.add(null);
+        for(int w=0;w<cases.size();w+=2){
+            list1=null;
+            if((cases.get(w)!=null)||(cases.get(w+1)!=null)){
+                if(cases.get(w)==null){ //set default
+                    cases.set(w,new ArrayList<String>());
+                    cases.get(w).addAll(def);
+                }
+                else if(cases.get(w+1)==null){ //set default
+                    cases.set(w+1,new ArrayList<String>());
+                    cases.get(w+1).addAll(def);
+                }
+                list1 = new ArrayList<>();
+                if(cases.get(w)!=null) //make sure that there is a case for the current vale
+                    for(int j=0;j<cases.get(w).size();j+=2){ //loop through all statements in an even case
+                        int k;
+                        if(cases.get(w+1)!=null){
+                            if(!cases.get(w+1).isEmpty()) //ensure that there is a case for current value +1
+                                for(k=0;k<cases.get(w+1).size();k+=2){ //loop through all statementse in the next odd case
+                                    if(cases.get(w).get(j+1).equals(cases.get(w+1).get(k+1))){
+                                        ifOne = cases.get(w+1).get(k);
+                                        cases.get(w+1).remove(k);
+                                        cases.get(w+1).remove(k);
+                                        break;
+                                    }
+                                }
+                        }
+                        list1.addAll(createMux(cases.get(w).get(j+1),ifOne,cases.get(w).get(j),"("+in+"_"+i+")"));
+//                        Wire wire = newWire();
+//                        assign(wire.name+" = ("+in+"_"+i+") ? "+ifOne+" : "+cases.get(w).get(j)+";");
+//                        list1.add(wire.name);
+//                        list1.add(cases.get(w).get(j+1));
+                        ifOne="gnd";
+                    }
+                
+                if(cases.get(w+1)!=null){
+                    if(!cases.get(w+1).isEmpty()) //ensure that there is a case for current value +1
+                        for(int k=0;k<cases.get(w+1).size();k+=2){ //loop through all the rest of the statements in the odd case
+                            list1.addAll(createMux(cases.get(w+1).get(k+1),cases.get(w+1).get(k),"gnd","("+in+"_"+i+")"));
+//                            Wire wire = newWire();
+//                            assign(wire.name+" = ("+in+"_"+i+") ? "+cases.get(w+1).get(k)+" : gnd;");
+//                            list1.add(wire.name);
+//                            list1.add(cases.get(w+1).get(k+1));
+                        }
+                }
+            }
+            
+            out.set(w/2,list1);
+        }
+        if(out.size()>=2)
+            return caseHelper(out,def,in,i+1);
+        return list1;
+    }
+    
+    /**
+     * Helper method to create multiple muxes if necessary (for vectors)
+     * @param outputName
+     * @param ifOne the one condition
+     * @param ifZero the zero condition
+     * @param cond the conditional logic
+     * @return [output wire, final output wire]
+     */
+    public ArrayList<String> createMux(String outputName,String ifOne,String ifZero,String cond){
+        ArrayList<String> list = new ArrayList<>();
+        Wire wire = newWire();
+        assign(wire.name+" = "+cond+" ? vcc : gnd;");
+        Wire w = currModule.getWire(outputName);
+        int currentWire = numWires;
+        if(w==null){ //for vectors
+            for(int i=0;currModule.getWire(outputName+"_"+i)!=null;i++){
+                Wire wire2 = new Wire("MISC_"+currentWire+"_"+i,1);
+                currModule.wires.add(wire2);
+                numWires++;
+                if(ifZero.equals("gnd")||ifZero.equals("vcc"))
+                    if(ifOne.equals("gnd")||ifOne.equals("vcc"))
+                        assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +";");
+                    else
+                        assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +"_"+i+" : " + ifZero +";");
+                
+                else if(ifOne.equals("gnd")||ifOne.equals("vcc"))
+                    if(ifZero.equals("gnd")||ifZero.equals("vcc"))
+                        assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +";");
+                    else
+                    assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +"_"+i+";");
+                else
+                    assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +"_"+i+" : " + ifZero +"_"+i+";");
+            }
+        }else{ //for non-vectors
+            Wire wire2 = newWire();
+            assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +";");
+        }
+        list.add("MISC_"+currentWire);
+        list.add(outputName);
+        return list;
+}
     
      /*
     This method handles the many different types of cases
@@ -2124,7 +1962,7 @@ public class Compiler2 {
     */
     public String invert(ArrayList<String> myStatement, ArrayList<Wire[]> wireSpots){
         int wire = Integer.parseInt(myStatement.get(0));
-        N_Inverter newInvert = new N_Inverter(newName("INV$"));
+        Inverter newInvert = new Inverter(newName("INV$"));
         currModule.parts.add(newInvert);
         Wire[] outWires = new Wire[wireSpots.get(wire).length];
         for(int i=0;i<wireSpots.get(wire).length;i++)
@@ -2720,6 +2558,17 @@ public class Compiler2 {
     */
     public void multiplierBD(Part myPart, ArrayList<Wire[]> inAndOuts){
         int bitSize=inAndOuts.get(0).length;
+        if(inAndOuts.get(2).length<(bitSize*2)){
+            Wire[] extras= new Wire[bitSize*2];
+            for(int i=0;i<((bitSize*2)-inAndOuts.get(2).length);i++){
+                extras[i]=newWire();
+            }
+            int spot=0;
+            for(int i=((bitSize*2)-inAndOuts.get(2).length);i<(bitSize*2);i++){
+                extras[i]=inAndOuts.get(2)[spot];
+                spot++;
+            }
+        }
         if(bitSize==1){
             assign(inAndOuts.get(2)[0].name+" = "+inAndOuts.get(0)[0].name+" & "+inAndOuts.get(1)[0].name+";");
         }
@@ -3043,6 +2892,12 @@ public class Compiler2 {
     */
     public Wire newWire(){
         currModule.addWire("MISC_"+numWires,1);
+        numWires++;
+        return currModule.wires.get(currModule.wires.size()-1);
+    }
+    
+    public Wire newWire(int size){
+        currModule.addWire("MISC_"+numWires,size);
         numWires++;
         return currModule.wires.get(currModule.wires.size()-1);
     }

@@ -29,7 +29,7 @@ public class Loader {
     
     public void loadFile(String fn){
         try{
-            FileReader reader = new FileReader(fn + ".v.txt");
+            FileReader reader = new FileReader(fn);
             BufferedReader buffer = new BufferedReader(reader);
             
             String line = buffer.readLine();

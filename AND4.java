@@ -9,12 +9,14 @@ package vlt;
  *
  * @author Parker
  */
-public class XOR extends Part{
+public class AND4 extends Part{
 
-    public XOR(String name){
+    public AND4(String name){
         super(name);
         ports.add(new Port("A",this));
         ports.add(new Port("B",this));
+        ports.add(new Port("C",this));
+        ports.add(new Port("D",this));
         ports.add(new Port("Y",this));
     }
 }

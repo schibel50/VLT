@@ -9,12 +9,10 @@ package vlt;
  *
  * @author Parker
  */
-public class XOR extends Part{
-
-    public XOR(String name){
+public class VCC extends Part{
+    
+    public VCC(String name){
         super(name);
-        ports.add(new Port("A",this));
-        ports.add(new Port("B",this));
-        ports.add(new Port("Y",this));
+        ports.add(new Port("port",this));
     }
 }

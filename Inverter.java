@@ -12,7 +12,7 @@ package vlt;
 public class Inverter extends Part{
     public Inverter(String name){
         super(name);
-        ports.add(new Port("a",this));
-        ports.add(new Port("b",this));
+        ports.add(new Port("In",this));
+        ports.add(new Port("Y",this));
     }
 }
