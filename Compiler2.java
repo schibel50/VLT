@@ -356,7 +356,7 @@ public class Compiler2 {
         if(!VCC.ports.get(0).name.equals("VCC")){
             VCC.ports.add(0,new Port("VCC",(byte)1));
         }
-        part2gate();
+//        part2gate();
         redundantIOPorts();
         for(int i=1;i<currModule.wires.get(2).ports.size();){
             Wire temp = newWire();
@@ -1775,11 +1775,10 @@ public class Compiler2 {
                     break;
                 }else if(line.charAt(i)=='['){ //handle single-bit calls on vectors
                     ops[0]+="_";
-                    for(;line.charAt(j)!=']';j++)
-                        if(line.charAt(j)!=' ')
-                            ops[0]+=line.charAt(j);
-                    type=2;
-                    j=1;
+                    i++;
+                    for(;line.charAt(i)!=']';i++)
+                        if(line.charAt(i)!=' ')
+                            ops[0]+=line.charAt(i);
                 }else if(line.charAt(i)!=' '){
                     ops[j]+=line.charAt(i);
                 }
@@ -1792,12 +1791,12 @@ public class Compiler2 {
         Wire wire, wire2; //internal wires to be used
         switch(type){
             case 0: //'assign' statement
-                if(currModule.getWire(ops[1].replaceAll("\\s","").replaceAll(";",""))!=null){ //see if we are just setting a wire to an existing wire
+                if(currModule.getWire(ops[1].replaceAll("\\s","").replaceAll(";","").replaceAll("\\[","_").replaceAll("\\]",""))!=null){ //see if we are just setting a wire to an existing wire
 //                    String[] star = new String[2];
 //                    star[0]=ops[1];
 //                    star[1]=wire.name;
 //                    preMod(star,6);
-                    list.add(ops[1].replaceAll("\\s","").replaceAll(";",""));
+                    list.add(ops[1].replaceAll("\\s","").replaceAll(";","").replaceAll("\\[","_").replaceAll("\\]",""));
                     list.add(ops[0]);
                 }else if(currModule.getWire(ops[1].replaceAll("\\s","").replaceAll(";","")+"_0")!=null){ //check again, but for vectors this time
                     list.add(ops[1].replaceAll("\\s","").replaceAll(";",""));
@@ -2066,13 +2065,18 @@ public class Compiler2 {
                     assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +"_"+i+";");
                 else
                     assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +"_"+i+" : " + ifZero +"_"+i+";");
+                
+                list.add(wire2.name);
+                list.add(outputName+"_"+i);
             }
         }else{ //for non-vectors
             Wire wire2 = newWire();
             assign(wire2.name+" = ("+wire.name+") ? "+ ifOne +" : " + ifZero +";");
+            list.add(wire2.name);
+            list.add(outputName);
         }
-        list.add("MISC_"+currentWire);
-        list.add(outputName);
+//        list.add("MISC_"+currentWire);
+//        list.add(outputName);
         return list;
     }
     
