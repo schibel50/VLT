@@ -12,13 +12,18 @@ import java.awt.GridLayout;
 import javax.swing.JTextArea;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import javax.imageio.ImageIO;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.UIManager;
+import javax.swing.border.BevelBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
 /**
@@ -32,19 +37,25 @@ public class GUI extends JFrame{
     private JButton b3;
     private JTextArea t1;
     private JTextArea t2;
+    private JCheckBox cb;
     private JFileChooser outputchooser;
     private JFileChooser inputchooser;
     private JOptionPane warning;
     private String input;
     private String output;
     
-    boolean flag;
+    boolean flag,flag2;
     
     public GUI(){
         super("VLT");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(500,300);
         setResizable(false);
+        
+        try{
+            BufferedImage image = ImageIO.read(new File("INSERT NAME HERE"));
+            setIconImage(image);
+        }catch(Exception e){}
         
         JPanel pane = new JPanel();
         
@@ -53,6 +64,7 @@ public class GUI extends JFrame{
         b3 = new JButton("Browse");
         t1 = new JTextArea("Input File Path",1,20);
         t2 = new JTextArea("Output File Path",1,20);
+        cb = new JCheckBox("Output  (.tpr)");
         
         b1.addActionListener(new MyActionListener());
         b2.addActionListener(new MyActionListener());
@@ -64,19 +76,23 @@ public class GUI extends JFrame{
         pane.add(b1);
         pane.add(b2);
         pane.add(b3);
+        pane.add(cb);
         pane.setLayout(null);
         b1.setBounds(62,300/2,110,30);
         b3.setBounds(328,300/2,110,30);
         b2.setBounds(195,(300/4)*3,110,30);
         t1.setBounds(17,300/4,200,20);
         t2.setBounds(283,300/4,200,20);
+        cb.setBounds(30,(300/4)*3+5,100,20);
 //        b1.setBounds(62,250,110,30);
 //        b3.setBounds(328,250,110,30);
 //        b2.setBounds(195,375,110,30);
 //        t1.setBounds(17,125,200,20);
 //        t2.setBounds(283,125,200,20);
-        t1.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-        t2.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+//        t1.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+        t1.setBorder(BorderFactory.createBevelBorder(BevelBorder.LOWERED));
+//        t2.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+        t2.setBorder(BorderFactory.createBevelBorder(BevelBorder.LOWERED));
         this.setContentPane(pane);
         
         //only show .v files for the input
@@ -101,6 +117,7 @@ public class GUI extends JFrame{
         setVisible(true);
         
         flag = true;
+        flag2 = false;
     }
     
     /**
@@ -132,10 +149,22 @@ public class GUI extends JFrame{
     }
     
     /**
-     * display warning messages
+     * display warning message regarding input/output
      */
     private void giveWarning(){
         JOptionPane.showMessageDialog(this,"ERROR: Missing input or output path");
+    }
+    
+    /**
+     * display error message regarding the translation
+     */
+    public void giveError(){
+        JOptionPane.showMessageDialog(this,"I AM ERROR (Your code is broken)");
+        flag=true;
+    }
+    
+    public void complete(){
+        JOptionPane.showMessageDialog(this,"PROCESS COMPLETE");
     }
     
     public String getFileName(){
@@ -156,6 +185,8 @@ public class GUI extends JFrame{
                     giveWarning();
                 }else{
                     flag = false;
+                    if(cb.isSelected())
+                        flag2 = true;
                 }
             }else if(e.getSource()==b3){
                 selectOutput();
